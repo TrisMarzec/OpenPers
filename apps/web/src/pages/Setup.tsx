@@ -6,6 +6,7 @@ import { REGION_NAMES, REGIONS } from '@openpers/shared';
 import { api, ApiError } from '../lib/api';
 import { setLanguage } from '../lib/i18n';
 import { Button, Field, Input, Select, Spinner } from '../components/ui';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export function AuthShell({ title, intro, children }: { title: string; intro?: ReactNode; children: ReactNode }) {
   return (
@@ -14,6 +15,9 @@ export function AuthShell({ title, intro, children }: { title: string; intro?: R
         <div className="mb-6 flex items-center gap-2">
           <img src="/favicon.svg" alt="" className="size-8" />
           <span className="text-lg font-bold">OpenPers</span>
+          <span className="ml-auto">
+            <ThemeToggle />
+          </span>
         </div>
         <div className="rounded-md border border-rule bg-sheet p-6">
           <h1 className="text-2xl font-bold">{title}</h1>

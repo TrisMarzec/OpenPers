@@ -5,6 +5,7 @@ const en: Dict = {
   nav: {
     dashboard: 'Overview',
     people: 'People',
+    org: 'Org chart',
     absences: 'Time off',
     time: 'Time tracking',
     documents: 'My documents',
@@ -68,6 +69,8 @@ const en: Dict = {
     DISABLED: 'Paused',
     ARCHIVED: 'Archived',
   },
+  theme: { label: 'Colour theme', dark: 'Dark', light: 'Light', system: 'Match system' },
+  org: { title: 'Org chart', summary: '{{people}} people · {{units}} units · largest team {{span}}', byReports: 'Reporting lines', byUnits: 'Departments', search: 'Search person, position or team', hits: '{{count}} matches', expandAll: 'Expand all', collapseAll: 'Collapse all', reports: '{{count}} direct reports', members: '{{count}} people', head: 'Head', subunits: '{{count}} sub-units', showAll: 'Show all', noUnits: 'No departments yet.', unassigned: '{{count}} people without a department' },
   setup: {
     title: 'Set up OpenPers',
     intro: 'Create your company and the first administrator account. You can configure everything else in settings afterwards.',

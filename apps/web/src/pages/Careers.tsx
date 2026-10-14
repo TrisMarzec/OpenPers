@@ -1,4 +1,5 @@
-import { useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { applyTheme, getThemePref } from '../lib/theme';
 import { Link, useParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -7,6 +8,11 @@ import { Markdown } from '../components/Markdown';
 import { Button, Checkbox, Empty, Field, Input, Spinner, Textarea } from '../components/ui';
 
 function CareersShell({ company, children }: { company?: string | null; children: ReactNode }) {
+  // The public careers page follows the visitor's system preference, not the app default.
+  useEffect(() => {
+    applyTheme('system');
+    return () => applyTheme(getThemePref());
+  }, []);
   return (
     <div className="min-h-screen bg-sheet">
       <header className="border-b border-rule">

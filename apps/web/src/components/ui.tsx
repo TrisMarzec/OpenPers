@@ -9,7 +9,7 @@ export { cx };
 // ---------- Button ----------
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 const variants: Record<Variant, string> = {
-  primary: 'bg-stamp text-white hover:bg-stamp-dark border-stamp hover:border-stamp-dark',
+  primary: 'bg-stamp text-on-stamp hover:bg-stamp-dark border-stamp hover:border-stamp-dark',
   secondary: 'bg-sheet text-ink border-rule hover:border-ink-faint',
   ghost: 'bg-transparent text-ink-soft border-transparent hover:bg-rule-soft hover:text-ink',
   danger: 'bg-sheet text-refuse border-refuse/40 hover:bg-refuse-wash',

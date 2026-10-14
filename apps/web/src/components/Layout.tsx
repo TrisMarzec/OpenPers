@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, CalendarDays, Clock, FileText, LayoutGrid, LogOut, Menu, Settings, Users, X } from 'lucide-react';
+import { Briefcase, CalendarDays, Clock, FileText, LayoutGrid, LogOut, Network, Menu, Settings, Users, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { setLanguage } from '../lib/i18n';
 import { fullName, initials } from '../lib/format';
 import { Avatar, cx } from './ui';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Layout() {
   const { t, i18n } = useTranslation();
@@ -22,6 +23,7 @@ export function Layout() {
   const items = [
     { to: '/', label: t('nav.dashboard'), icon: LayoutGrid, show: true, end: true },
     { to: '/people', label: t('nav.people'), icon: Users, show: true },
+    { to: '/org', label: t('nav.org'), icon: Network, show: true },
     { to: '/absences', label: t('nav.absences'), icon: CalendarDays, show: true, badge: pending },
     { to: '/time', label: t('nav.time'), icon: Clock, show: can('time.track') || can('time.read') },
     { to: '/documents', label: t('nav.documents'), icon: FileText, show: !!me?.personId },
@@ -67,6 +69,9 @@ export function Layout() {
             <div className="truncate text-ink-faint">{me?.email}</div>
           </div>
         </div>
+        <div className="px-2 pb-2">
+          <ThemeToggle />
+        </div>
         <div className="flex items-center gap-1 px-1">
           <button
             type="button"
@@ -98,7 +103,7 @@ export function Layout() {
         </button>
       </div>
       {open && (
-        <div className="fixed inset-0 z-40 bg-ink/30 lg:hidden" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-40 bg-[var(--color-scrim)] lg:hidden" onClick={() => setOpen(false)}>
           <aside className="h-full w-72 bg-sheet" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="absolute top-3 left-60 rounded p-1">
               <X size={18} />

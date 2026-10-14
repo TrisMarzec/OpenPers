@@ -27,8 +27,42 @@
   --color-grant-wash: #e6f3ec;
   --color-wait: #8a5a00;
   --color-wait-wash: #fdf3dc;
+  /* Text on stamp-coloured (primary) surfaces. */
+  --color-on-stamp: #ffffff;
+  --color-scrim: rgb(22 35 63 / 0.35);
 
   --radius-ctl: 6px;
+}
+
+/*
+ * Dark theme (default): "ink at night" – the paper turns to deep navy ink and the stamp colours
+ * lighten so they keep ≥ 4.5:1 contrast as text. Primary buttons switch to dark text on light ink.
+ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-paper: #0e1525;
+  --color-sheet: #152036;
+  --color-ink: #e7ecf6;
+  --color-ink-soft: #b0bad0;
+  --color-ink-faint: #8792a8;
+  --color-rule: #2b3754;
+  --color-rule-soft: #1e2943;
+
+  --color-stamp: #8ea3ff;
+  --color-stamp-dark: #b0beff;
+  --color-stamp-wash: #1f2c5c;
+  --color-refuse: #ff938a;
+  --color-refuse-wash: #3b1b20;
+  --color-grant: #74d6a6;
+  --color-grant-wash: #133229;
+  --color-wait: #f3c56f;
+  --color-wait-wash: #352a10;
+  --color-on-stamp: #0b1430;
+  --color-scrim: rgb(0 0 0 / 0.55);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
 }
 
 html {
@@ -81,8 +115,76 @@ h3 {
   background-repeat: repeat-y;
 }
 
+/* Org chart: nested lists drawn as a top-down tree with ruled connector lines. */
+.orgtree ul {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  margin: 0;
+  padding: 20px 0 0;
+}
+.orgtree li {
+  list-style: none;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 6px 0;
+}
+.orgtree li::before,
+.orgtree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 20px;
+  border-top: 1.5px solid var(--color-rule);
+}
+.orgtree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 1.5px solid var(--color-rule);
+}
+.orgtree li:only-child {
+  padding-top: 0;
+}
+.orgtree li:only-child::before,
+.orgtree li:only-child::after {
+  display: none;
+}
+.orgtree li:first-child::before,
+.orgtree li:last-child::after {
+  border: 0 none;
+}
+.orgtree li:last-child::before {
+  border-right: 1.5px solid var(--color-rule);
+  border-radius: 0 6px 0 0;
+}
+.orgtree li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+.orgtree ul ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  height: 20px;
+  border-left: 1.5px solid var(--color-rule);
+}
+.orgtree > ul {
+  padding-top: 0;
+}
+.orgtree > ul > li {
+  padding-top: 0;
+}
+.orgtree > ul > li::before,
+.orgtree > ul > li::after {
+  display: none;
+}
+
 dialog::backdrop {
-  background: rgb(22 35 63 / 0.35);
+  background: var(--color-scrim);
 }
 
 @media (prefers-reduced-motion: reduce) {

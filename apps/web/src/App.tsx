@@ -11,6 +11,7 @@ import { LoginPage } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
 import { PeoplePage } from './pages/People';
 import { PersonPage } from './pages/Person';
+import { OrgChartPage } from './pages/OrgChart';
 import { AbsencesPage } from './pages/Absences';
 import { TimePage } from './pages/Time';
 import { MyDocumentsPage } from './pages/Documents';
@@ -52,6 +53,7 @@ export function App() {
               <Route index element={<DashboardPage />} />
               <Route path="people" element={<PeoplePage />} />
               <Route path="people/:id" element={<PersonPage />} />
+              <Route path="org" element={<OrgChartPage />} />
               <Route path="absences" element={<AbsencesPage />} />
               <Route path="time" element={<TimePage />} />
               <Route path="documents" element={<MyDocumentsPage />} />

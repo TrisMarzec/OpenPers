@@ -3,9 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="dark light" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>OpenPers</title>
+    <script>
+      // Apply the colour theme before first paint (dark is the default).
+      (function () {
+        var pref = 'dark';
+        try { pref = localStorage.getItem('openpers.theme') || 'dark'; } catch (e) {}
+        if (pref === 'system') pref = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = pref === 'light' ? 'light' : 'dark';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

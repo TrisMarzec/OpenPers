@@ -3,6 +3,7 @@ const de = {
   nav: {
     dashboard: 'Übersicht',
     people: 'Mitarbeitende',
+    org: 'Organigramm',
     absences: 'Abwesenheiten',
     time: 'Zeiterfassung',
     documents: 'Meine Dokumente',
@@ -66,6 +67,8 @@ const de = {
     DISABLED: 'Pausiert',
     ARCHIVED: 'Archiviert',
   },
+  theme: { label: 'Farbschema', dark: 'Dunkel', light: 'Hell', system: 'Wie System' },
+  org: { title: 'Organigramm', summary: '{{people}} Personen · {{units}} Einheiten · größtes Team {{span}}', byReports: 'Berichtslinien', byUnits: 'Abteilungen', search: 'Person, Position oder Team suchen', hits: '{{count}} Treffer', expandAll: 'Alles aufklappen', collapseAll: 'Alles einklappen', reports: '{{count}} direkte Berichte', members: '{{count}} Personen', head: 'Leitung', subunits: '{{count}} Untereinheiten', showAll: 'Alle anzeigen', noUnits: 'Noch keine Abteilungen angelegt.', unassigned: '{{count}} Personen ohne Abteilung' },
   setup: {
     title: 'OpenPers einrichten',
     intro: 'Lege deine Firma und das erste Administrationskonto an. Alles Weitere stellst du danach in den Einstellungen ein.',
