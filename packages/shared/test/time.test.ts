@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkArbZG, computeTimeBalance, requiredBreakMinutes } from '../src/time';
+import { checkArbZG, computeTimeBalance, minimalCompliantBreak, requiredBreakMinutes } from '../src/time';
 import type { ScheduleVersion } from '../src/dates';
 
 const w = (start: string, end: string) => ({ start: `2026-06-08T${start}:00`, end: `2026-06-08T${end}:00` });
@@ -34,6 +34,18 @@ describe('requiredBreakMinutes', () => {
     [541, 45],
   ])('needs %i min work → %i min break', (work, br) => {
     expect(requiredBreakMinutes(work)).toBe(br);
+  });
+});
+
+describe('minimalCompliantBreak', () => {
+  it.each([
+    [540, 0, 30], // 9h span → 8h30 work needs 30
+    [600, 0, 45], // 10h span → needs 45 (9h15 work)
+    [380, 0, 20], // 6h20 span: a 20 min break brings work to 6h, no further break needed
+    [540, 40, 40], // already enough
+    [300, 0, 0],
+  ])('span %i min, recorded %i → %i', (span, recorded, expected) => {
+    expect(minimalCompliantBreak(span, recorded)).toBe(expected);
   });
 });
 

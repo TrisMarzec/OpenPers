@@ -100,6 +100,85 @@ describe('time tracking', () => {
     expect((await mgr.client.get(`/api/v1/attendance?personId=${other.personId}&from=2026-06-12&to=2026-06-12`)).body.items).toHaveLength(1);
   });
 
+  describe('monthly attendance list', () => {
+    it('saves a day inline and returns it in the month view with target, break and difference', async () => {
+      const emp = await newEmployee('Lisa');
+      const put = await emp.client.put('/api/v1/attendance/day', { date: '2026-06-08', start: '08:00', end: '17:00', breakMinutes: 30, location: 'remote' });
+      expect(put.status).toBe(200);
+      const month = await emp.client.get(`/api/v1/attendance/month?personId=${emp.personId}&month=2026-06`);
+      expect(month.status).toBe(200);
+      expect(month.body.days).toHaveLength(30);
+      expect(month.body.days.find((d: any) => d.date === '2026-06-08')).toMatchObject({
+        start: '08:00',
+        end: '17:00',
+        breakMinutes: 30,
+        workedMinutes: 510,
+        targetMinutes: 480,
+        diffMinutes: 30,
+        location: 'remote',
+        periodCount: 1,
+        warnings: [],
+      });
+      expect(month.body.totals.workedMinutes).toBe(510);
+    });
+
+    it('replaces clocked periods of the day with a single entry', async () => {
+      const emp = await newEmployee('Rudi');
+      await emp.client.post('/api/v1/attendance', entry('2026-06-09', '08:00', '12:00'));
+      await emp.client.post('/api/v1/attendance', entry('2026-06-09', '12:30', '16:30'));
+      let day = (await emp.client.get(`/api/v1/attendance/month?personId=${emp.personId}&month=2026-06`)).body.days.find((d: any) => d.date === '2026-06-09');
+      expect(day).toMatchObject({ start: '08:00', end: '16:30', breakMinutes: 30, workedMinutes: 480, periodCount: 2 });
+      await emp.client.put('/api/v1/attendance/day', { date: '2026-06-09', start: '09:00', end: '17:00', breakMinutes: 30 });
+      day = (await emp.client.get(`/api/v1/attendance/month?personId=${emp.personId}&month=2026-06`)).body.days.find((d: any) => d.date === '2026-06-09');
+      expect(day).toMatchObject({ start: '09:00', end: '17:00', workedMinutes: 450, periodCount: 1 });
+    });
+
+    it('marks holidays, weekends and absences with reduced targets', async () => {
+      const emp = await newEmployee('Hilde');
+      const types = await admin.get('/api/v1/absence-types');
+      const vac = types.body.items.find((x: any) => x.category === 'vacation').id;
+      await admin.post('/api/v1/absence-periods', { personId: emp.personId, typeId: vac, startDate: '2026-05-11', endDate: '2026-05-11', endHalf: false, startHalf: true });
+      const days = (await emp.client.get(`/api/v1/attendance/month?personId=${emp.personId}&month=2026-05`)).body.days;
+      expect(days.find((d: any) => d.date === '2026-05-14')).toMatchObject({ holiday: 'Christi Himmelfahrt', targetMinutes: 0 });
+      expect(days.find((d: any) => d.date === '2026-05-16')).toMatchObject({ weekend: true, targetMinutes: 0 });
+      expect(days.find((d: any) => d.date === '2026-05-11')).toMatchObject({ targetMinutes: 240, absence: { typeName: 'Urlaub', fraction: 0.5 } });
+    });
+
+    it('auto-deducts the statutory break when configured', async () => {
+      await admin.patch('/api/v1/time-settings', { autoDeductBreaks: true });
+      const emp = await newEmployee('Auto');
+      const put = await emp.client.put('/api/v1/attendance/day', { date: '2026-06-10', start: '08:00', end: '17:00', breakMinutes: 0 });
+      expect(put.body).toMatchObject({ breakAdjusted: true, breakMinutes: 30 });
+      await admin.patch('/api/v1/time-settings', { autoDeductBreaks: false });
+    });
+
+    it('supports overnight shifts, clearing a day and rejects invalid input', async () => {
+      const emp = await newEmployee('Nacht');
+      const night = await emp.client.put('/api/v1/attendance/day', { date: '2026-06-11', start: '22:00', end: '06:00', breakMinutes: 30 });
+      expect(night.status).toBe(200);
+      expect(night.body.workedMinutes).toBe(450);
+      expect((await emp.client.put('/api/v1/attendance/day', { date: '2026-06-12', start: '25:00', end: '06:00', breakMinutes: 0 })).status).toBe(422);
+      expect((await emp.client.put('/api/v1/attendance/day', { date: '2026-06-12', start: '08:00', end: '09:00', breakMinutes: 90 })).status).toBe(422);
+      expect((await emp.client.delete(`/api/v1/attendance/day?date=2026-06-11`)).status).toBe(204);
+      const day = (await emp.client.get(`/api/v1/attendance/month?personId=${emp.personId}&month=2026-06`)).body.days.find((d: any) => d.date === '2026-06-11');
+      expect(day).toMatchObject({ start: null, workedMinutes: 0, periodCount: 0 });
+    });
+
+    it('enforces scopes on the day endpoint', async () => {
+      const emp = await newEmployee('Ernst');
+      const other = await newEmployee('Olga');
+      expect((await emp.client.put('/api/v1/attendance/day', { personId: other.personId, date: '2026-06-08', start: '08:00', end: '12:00', breakMinutes: 0 })).status).toBe(403);
+      expect((await emp.client.get(`/api/v1/attendance/month?personId=${other.personId}&month=2026-06`)).status).toBe(403);
+    });
+
+    it('subtracts recorded breaks in the overtime balance', async () => {
+      const emp = await newEmployee('Bilanz', '2026-06-15');
+      await emp.client.put('/api/v1/attendance/day', { date: '2026-06-15', start: '08:00', end: '17:00', breakMinutes: 60 });
+      const bal = await emp.client.get(`/api/v1/persons/${emp.personId}/time-balance?from=2026-06-15&to=2026-06-15`);
+      expect(bal.body).toMatchObject({ workedMinutes: 480, balanceMinutes: 0 });
+    });
+  });
+
   it('lets employees edit and delete their own unapproved-or-recent entries', async () => {
     const emp = await newEmployee('Edda');
     const e = await emp.client.post('/api/v1/attendance', entry('2026-06-15', '08:00', '12:00'));

@@ -26,6 +26,17 @@ export function requiredBreakMinutes(workMinutes: number): number {
 }
 
 /**
+ * Smallest break (≥ the recorded one) that makes a working span compliant with ArbZG §4.
+ * A longer break shortens working time, which can lower the requirement (6h20 span → 20 min).
+ */
+export function minimalCompliantBreak(spanMinutes: number, recordedBreak: number): number {
+  const candidates = [recordedBreak, spanMinutes - 6 * 60, 30, spanMinutes - 9 * 60, 45]
+    .filter((b) => b >= recordedBreak && b < spanMinutes)
+    .sort((a, b) => a - b);
+  return candidates.find((b) => b >= requiredBreakMinutes(spanMinutes - b)) ?? recordedBreak;
+}
+
+/**
  * Checks one day's WORK intervals against the German Working Hours Act (ArbZG §§3–5).
  * Breaks are the gaps between work intervals plus recorded break minutes; only segments
  * of ≥ 15 minutes count (§4). Returns warnings only – OpenPers never blocks time entries.

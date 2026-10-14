@@ -36,6 +36,13 @@
       "when": 1792007102875,
       "tag": "0004_recruiting",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792012721578,
+      "tag": "0005_attendance_breaks",
+      "breakpoints": true
     }
   ]
 }

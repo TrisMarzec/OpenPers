@@ -1,4 +1,4 @@
-import { boolean, date, index, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, index, integer, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { persons } from '../people/schema';
 
 const id = () => uuid('id').primaryKey().defaultRandom();
@@ -34,6 +34,10 @@ export const attendancePeriods = pgTable(
     /** Local date-times without offset, in the company timezone. */
     startAt: timestamp('start_at', { mode: 'string' }).notNull(),
     endAt: timestamp('end_at', { mode: 'string' }),
+    /** Unpaid break inside this WORK period, in minutes. */
+    breakMinutes: integer('break_minutes').notNull().default(0),
+    /** office | remote | on_site */
+    location: text('location'),
     projectId: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
     comment: text('comment'),
     /** pending | approved | rejected */
