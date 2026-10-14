@@ -283,6 +283,8 @@ const en: Dict = {
     hired: 'Hired – employee file created',
     rating: 'Rating',
     channel: 'Channel',
+    hiringTeam: 'Hiring team',
+    hiringTeamHint: 'Managers only see applications for jobs whose hiring team they belong to.',
   },
   careers: {
     title: 'Open positions',

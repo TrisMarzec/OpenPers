@@ -5,12 +5,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { fmtDate } from '../lib/format';
-import { Button, Dialog, Empty, Field, Input, PageHeader, Select, Spinner, Stamp, Table, Textarea, useErrorText, useToast } from '../components/ui';
+import { Button, Checkbox, Dialog, Empty, Field, Input, PageHeader, Select, Spinner, Stamp, Table, Textarea, useErrorText, useToast } from '../components/ui';
 import { useOrgData } from './People';
 
 export function JobForm({ value, onChange }: { value: any; onChange: (v: any) => void }) {
   const { t } = useTranslation();
   const org = useOrgData();
+  const team = useQuery({ queryKey: ['team-candidates'], queryFn: () => api.get('/recruiting/team-candidates') });
+  const selected: string[] = value.hiringTeamUserIds ?? [];
   const set = (k: string) => (e: { target: { value: string } }) => onChange({ ...value, [k]: e.target.value });
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -46,6 +48,15 @@ export function JobForm({ value, onChange }: { value: any; onChange: (v: any) =>
           ))}
         </Select>
       </Field>
+      <fieldset className="sm:col-span-2">
+        <legend className="mb-1 text-sm font-semibold">{t('recruiting.hiringTeam')}</legend>
+        <p className="mb-2 text-sm text-ink-faint">{t('recruiting.hiringTeamHint')}</p>
+        <div className="grid max-h-40 gap-1.5 overflow-y-auto sm:grid-cols-2">
+          {(team.data?.items ?? []).map((u: any) => (
+            <Checkbox key={u.userId} label={`${u.firstName} ${u.lastName}`} checked={selected.includes(u.userId)} onChange={(v) => onChange({ ...value, hiringTeamUserIds: v ? [...selected, u.userId] : selected.filter((x) => x !== u.userId) })} />
+          ))}
+        </div>
+      </fieldset>
       <Field label={t('recruiting.description')} hint={t('recruiting.descriptionHint')} className="sm:col-span-2">
         <Textarea rows={10} value={value.description} onChange={set('description')} />
       </Field>
@@ -53,7 +64,7 @@ export function JobForm({ value, onChange }: { value: any; onChange: (v: any) =>
   );
 }
 
-export const jobPayload = (j: any) => ({ title: j.title, employmentType: j.employmentType, departmentOrgUnitId: j.departmentOrgUnitId || null, workplaceId: j.workplaceId || null, description: j.description });
+export const jobPayload = (j: any) => ({ title: j.title, employmentType: j.employmentType, departmentOrgUnitId: j.departmentOrgUnitId || null, workplaceId: j.workplaceId || null, description: j.description, hiringTeamUserIds: j.hiringTeamUserIds ?? [] });
 
 export function RecruitingPage() {
   const { t } = useTranslation();

@@ -1,10 +1,11 @@
 import { and, asc, desc, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DB } from '../../db';
-import { applicationNotes, applications, applicationStageTransitions, candidates, company, hiringTeamMembers, jobs, orgUnits, pipelineStages, workplaces } from '../../db/schema';
+import { applicationNotes, applications, applicationStageTransitions, candidates, company, hiringTeamMembers, jobs, orgUnits, persons, pipelineStages, users, workplaces } from '../../db/schema';
 import { makeRoute } from '../../lib/api';
 import { audit, emit, type AppContext, type OpenPersModule } from '../../lib/context';
-import { conflict, notFound, unprocessable } from '../../lib/errors';
+import { conflict, forbidden, notFound, unprocessable } from '../../lib/errors';
+import type { Principal } from '../../lib/authz';
 import { checkFileType } from '../documents';
 import { createPersonWithEmployment, employmentInput, isoDateSchema } from '../people/service';
 
@@ -79,6 +80,24 @@ export const recruitingModule: OpenPersModule = {
         const [dup] = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.slug, slug));
         if (!dup || dup.id === excludeId) return slug;
       }
+    }
+
+    /** Jobs the caller may see: all with company-wide recruiting rights, otherwise only hiring-team jobs. */
+    async function visibleJobIds(user: Principal): Promise<Set<string> | null> {
+      if ((user.permissions['recruiting.read'] ?? []).includes('all')) return null;
+      const rows = await db.select({ jobId: hiringTeamMembers.jobId }).from(hiringTeamMembers).where(eq(hiringTeamMembers.userId, user.userId));
+      return new Set(rows.map((r) => r.jobId));
+    }
+
+    async function assertJobAccess(user: Principal, jobId: string) {
+      const visible = await visibleJobIds(user);
+      if (visible && !visible.has(jobId)) throw forbidden('Not on the hiring team of this job');
+    }
+
+    async function loadApplicationFor(user: Principal, id: string) {
+      const a = await loadApplication(id);
+      await assertJobAccess(user, a.jobId);
+      return a;
     }
 
     async function loadApplication(id: string) {
@@ -157,14 +176,16 @@ export const recruitingModule: OpenPersModule = {
       status: z.enum(['draft', 'published', 'closed']).default('draft'),
       hiringTeamUserIds: z.array(z.string().uuid()).optional(),
     });
-    route({ method: 'GET', url: '/api/v1/jobs', perm: 'recruiting.read', tag: 'recruiting', summary: 'List jobs with application counts' }, async () => {
-      const list = await db.select().from(jobs).orderBy(desc(jobs.updatedAt));
+    route({ method: 'GET', url: '/api/v1/jobs', perm: 'recruiting.read', tag: 'recruiting', summary: 'List jobs with application counts' }, async ({ user }) => {
+      const visible = await visibleJobIds(user);
+      const list = (await db.select().from(jobs).orderBy(desc(jobs.updatedAt))).filter((j) => !visible || visible.has(j.id));
       const counts = await db.select({ jobId: applications.jobId, n: sql<number>`count(*)::int` }).from(applications).where(isNull(applications.closedAt)).groupBy(applications.jobId);
       return { items: list.map((j) => ({ ...j, openApplications: counts.find((c) => c.jobId === j.id)?.n ?? 0 })) };
     });
-    route({ method: 'GET', url: '/api/v1/jobs/:id', perm: 'recruiting.read', tag: 'recruiting', summary: 'Job details' }, async ({ params }) => {
+    route({ method: 'GET', url: '/api/v1/jobs/:id', perm: 'recruiting.read', tag: 'recruiting', summary: 'Job details' }, async ({ user, params }) => {
       const [j] = await db.select().from(jobs).where(eq(jobs.id, params.id));
       if (!j) throw notFound();
+      await assertJobAccess(user, j.id);
       const team = await db.select().from(hiringTeamMembers).where(eq(hiringTeamMembers.jobId, j.id));
       return { ...j, hiringTeam: team };
     });
@@ -188,13 +209,28 @@ export const recruitingModule: OpenPersModule = {
       return j;
     });
 
+    route({ method: 'GET', url: '/api/v1/recruiting/team-candidates', perm: 'recruiting.write', tag: 'recruiting', summary: 'Active users that can be added to a hiring team' }, async () => {
+      const rows = await db
+        .select({ userId: users.id, email: users.email, firstName: persons.firstName, lastName: persons.lastName })
+        .from(users)
+        .innerJoin(persons, eq(persons.id, users.personId))
+        .where(and(eq(users.active, true), isNull(persons.anonymizedAt)))
+        .orderBy(asc(persons.lastName));
+      return { items: rows };
+    });
+
     // ---------- Applications ----------
-    route({ method: 'GET', url: '/api/v1/applications', perm: 'recruiting.read', tag: 'recruiting', summary: 'List applications', query: z.object({ jobId: z.string().uuid().optional(), stageId: z.string().uuid().optional() }) }, async ({ query }) => {
-      const conds = [query.jobId ? eq(applications.jobId, query.jobId) : undefined, query.stageId ? eq(applications.stageId, query.stageId) : undefined].filter(Boolean) as any[];
+    route({ method: 'GET', url: '/api/v1/applications', perm: 'recruiting.read', tag: 'recruiting', summary: 'List applications', query: z.object({ jobId: z.string().uuid().optional(), stageId: z.string().uuid().optional() }) }, async ({ user, query }) => {
+      const visible = await visibleJobIds(user);
+      if (visible && !visible.size) return { items: [] };
+      const conds = [query.jobId ? eq(applications.jobId, query.jobId) : undefined, query.stageId ? eq(applications.stageId, query.stageId) : undefined, visible ? inArray(applications.jobId, [...visible]) : undefined].filter(Boolean) as any[];
       const rows = await db.select({ id: applications.id }).from(applications).where(conds.length ? and(...conds) : undefined).orderBy(desc(applications.appliedAt)).limit(2000);
       return { items: await Promise.all(rows.map((r) => applicationView(r.id))) };
     });
-    route({ method: 'GET', url: '/api/v1/applications/:id', perm: 'recruiting.read', tag: 'recruiting', summary: 'Application details incl. history and notes' }, async ({ params }) => applicationView(params.id, true));
+    route({ method: 'GET', url: '/api/v1/applications/:id', perm: 'recruiting.read', tag: 'recruiting', summary: 'Application details incl. history and notes' }, async ({ user, params }) => {
+      await loadApplicationFor(user, params.id);
+      return applicationView(params.id, true);
+    });
     route(
       {
         method: 'POST',
@@ -213,23 +249,24 @@ export const recruitingModule: OpenPersModule = {
       },
     );
     route({ method: 'PATCH', url: '/api/v1/applications/:id', perm: 'recruiting.write', tag: 'recruiting', summary: 'Rate an application', body: z.object({ rating: z.number().int().min(1).max(5).nullable() }) }, async ({ user, params, body }) => {
-      await loadApplication(params.id);
+      await loadApplicationFor(user, params.id);
       await db.update(applications).set({ rating: body.rating, updatedAt: new Date() }).where(eq(applications.id, params.id));
       await audit(db, user.userId, 'application', params.id, 'rate', body);
       return applicationView(params.id);
     });
     route({ method: 'POST', url: '/api/v1/applications/:id/move', perm: 'recruiting.write', tag: 'recruiting', summary: 'Move to pipeline stage', body: z.object({ stageId: z.string().uuid() }) }, async ({ user, params, body }) => {
+      await loadApplicationFor(user, params.id);
       await moveTo(params.id, body.stageId, user.userId);
       return applicationView(params.id);
     });
     route({ method: 'POST', url: '/api/v1/applications/:id/notes', perm: 'recruiting.read', tag: 'recruiting', summary: 'Add a note', body: z.object({ body: z.string().min(1).max(10_000) }) }, async ({ user, params, body }, reply) => {
-      await loadApplication(params.id);
+      await loadApplicationFor(user, params.id);
       const [n] = await db.insert(applicationNotes).values({ applicationId: params.id, authorUserId: user.userId, body: body.body }).returning();
       reply.code(201);
       return n;
     });
     route({ method: 'GET', url: '/api/v1/applications/:id/cv', perm: 'recruiting.read', tag: 'recruiting', summary: 'Download CV' }, async ({ user, params }, reply) => {
-      const a = await loadApplication(params.id);
+      const a = await loadApplicationFor(user, params.id);
       if (!a.cvFileKey) throw notFound('No CV');
       await audit(db, user.userId, 'application', a.id, 'cv_download');
       reply
@@ -248,8 +285,8 @@ export const recruitingModule: OpenPersModule = {
         body: employmentInput.partial().extend({ startDate: isoDateSchema }),
       },
       async ({ user, params, body }) => {
-        if (!ctx.authz.has(user, 'people.write')) throw unprocessable('Missing permission', [{ path: 'startDate', message: 'Hiring requires people.write' }]);
-        const a = await loadApplication(params.id);
+        if (!ctx.authz.has(user, 'people.write')) throw forbidden('Hiring requires people.write');
+        const a = await loadApplicationFor(user, params.id);
         if (a.hiredPersonId) throw conflict('Candidate already hired');
         const [candidate] = await db.select().from(candidates).where(eq(candidates.id, a.candidateId));
         const [job] = await db.select().from(jobs).where(eq(jobs.id, a.jobId));

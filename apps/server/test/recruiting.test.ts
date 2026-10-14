@@ -107,6 +107,22 @@ describe('recruiting', () => {
     expect((await emp.client.post('/api/v1/jobs', { title: 'Hack' })).status).toBe(403);
   });
 
+  it('limits managers to jobs where they are on the hiring team', async () => {
+    const mgr = await createEmployee(app, admin, { firstName: 'Teamlos', role: 'manager' });
+    const apps = await mgr.client.get(`/api/v1/applications?jobId=${job.id}`);
+    expect(apps.status).toBe(200);
+    expect(apps.body.items).toHaveLength(0);
+    expect((await mgr.client.get('/api/v1/jobs')).body.items).toHaveLength(0);
+    const any = (await admin.get(`/api/v1/applications?jobId=${job.id}`)).body.items[0];
+    expect((await mgr.client.get(`/api/v1/applications/${any.id}`)).status).toBe(403);
+
+    const candidates = await admin.get('/api/v1/recruiting/team-candidates');
+    expect(candidates.body.items.find((c: any) => c.userId === mgr.userId)).toMatchObject({ firstName: 'Teamlos' });
+    await admin.patch(`/api/v1/jobs/${job.id}`, { hiringTeamUserIds: [mgr.userId] });
+    expect((await mgr.client.get(`/api/v1/applications?jobId=${job.id}`)).body.items.length).toBeGreaterThan(0);
+    expect((await mgr.client.get(`/api/v1/applications/${any.id}`)).status).toBe(200);
+  });
+
   it('anonymizes closed applications after the retention period (DSGVO)', async () => {
     await apply(job.slug, applicant('old@example.com'));
     const a = (await admin.get(`/api/v1/applications?jobId=${job.id}`)).body.items.find((x: any) => x.candidate.email === 'old@example.com');

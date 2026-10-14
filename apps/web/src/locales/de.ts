@@ -281,6 +281,8 @@ const de = {
     hired: 'Eingestellt – Personalakte angelegt',
     rating: 'Bewertung',
     channel: 'Kanal',
+    hiringTeam: 'Hiring-Team',
+    hiringTeamHint: 'Führungskräfte sehen nur Bewerbungen zu Stellen, in deren Hiring-Team sie sind.',
   },
   careers: {
     title: 'Offene Stellen',

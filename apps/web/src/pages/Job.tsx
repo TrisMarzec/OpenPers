@@ -195,7 +195,7 @@ export function JobPage() {
         actions={
           writable && (
             <>
-              <Button onClick={() => setEditing({ ...j })}>{t('common.edit')}</Button>
+              <Button onClick={() => setEditing({ ...j, hiringTeamUserIds: (j.hiringTeam ?? []).map((m: any) => m.userId) })}>{t('common.edit')}</Button>
               {j.status !== 'published' ? (
                 <Button variant="primary" onClick={() => update.mutate({ status: 'published' })}>
                   {t('recruiting.publish')}
