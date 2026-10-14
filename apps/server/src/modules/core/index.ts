@@ -9,6 +9,7 @@ import { hashPassword, randomToken, sha256, verifyPassword } from '../../lib/cry
 import { conflict, forbidden, HttpError, notFound, unauthorized, unprocessable } from '../../lib/errors';
 import { createPersonWithEmployment } from '../people/service';
 import { loadPrincipal, SESSION_COOKIE, SESSION_DAYS } from './principal';
+import { registerWebhookRoutes } from './webhooks';
 import type { Principal } from '../../lib/authz';
 
 const regionSchema = z.enum(REGIONS as [string, ...string[]]);
@@ -55,6 +56,7 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
     register(app, ctx: AppContext) {
       const { db } = ctx;
       const route = makeRoute(app, ctx.registry);
+      registerWebhookRoutes(app, ctx);
 
       // ---------- Setup ----------
       route({ method: 'GET', url: '/api/v1/setup/status', auth: false, tag: 'setup', summary: 'Whether initial setup is required' }, async () => {

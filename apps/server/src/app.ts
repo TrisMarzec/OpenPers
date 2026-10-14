@@ -16,6 +16,9 @@ import { LocalStorage } from './lib/storage';
 import { coreModule } from './modules/core';
 import { registerAuthHook } from './modules/core/principal';
 import { featureModules } from './modules';
+import { maintenanceJobs, startWorker } from './lib/worker';
+import { applyDueEmploymentChanges } from './modules/people';
+import { anonymizeExpiredApplications, retentionMonths } from './modules/recruiting';
 
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
@@ -73,6 +76,19 @@ export async function buildApp(overrides: Partial<Config> = {}): Promise<Fastify
     });
   } else {
     app.setNotFoundHandler((_req, reply) => reply.code(404).type('application/problem+json').send(problem(404, 'Not found')));
+  }
+
+  if (!maintenanceJobs.length) {
+    maintenanceJobs.push(
+      async (c) => applyDueEmploymentChanges(c.db),
+      async (c) => {
+        await anonymizeExpiredApplications(c.db, await retentionMonths(c.db));
+      },
+    );
+  }
+  if (config.startWorker) {
+    const stop = startWorker(ctx, app.log);
+    app.addHook('onClose', async () => stop());
   }
 
   await app.ready();
