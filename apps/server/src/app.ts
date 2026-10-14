@@ -31,7 +31,7 @@ export async function buildApp(overrides: Partial<Config> = {}): Promise<Fastify
 
   const app = Fastify({ logger: config.logger ? { level: process.env.LOG_LEVEL ?? 'info' } : false, bodyLimit: 2 * 1024 * 1024, trustProxy: true });
   const registry: RouteRecord[] = [];
-  const ctx: AppContext = { db, config, authz: new Authz(db), cipher: new FieldCipher(config.secretKey), storage: new LocalStorage(config.storageDir), registry };
+  const ctx: AppContext = { db, config, authz: new Authz(db), cipher: new FieldCipher(config.secretKey), storage: new LocalStorage(config.storageDir), registry, exporters: {}, anonymizers: [] };
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => close());
 

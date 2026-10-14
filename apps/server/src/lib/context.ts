@@ -14,6 +14,10 @@ export interface AppContext {
   cipher: FieldCipher;
   storage: StorageAdapter;
   registry: RouteRecord[];
+  /** Per-module contributions to the DSGVO data export of a person. */
+  exporters: Record<string, (db: Exec, personId: string) => Promise<unknown>>;
+  /** Per-module hooks that remove personal data when a person is anonymized. */
+  anonymizers: Array<(tx: Exec, personId: string) => Promise<void>>;
 }
 
 export interface SetupInfo {
