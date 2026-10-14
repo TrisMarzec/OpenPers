@@ -4,12 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env --watch --import tsx src/index.ts",
     "build": "tsup",
     "test": "vitest run",
     "typecheck": "tsc -p .",
     "db:generate": "drizzle-kit generate",
-    "seed:demo": "tsx src/seed-demo.ts"
+    "seed:demo": "node --env-file-if-exists=../../.env --import tsx src/seed-demo.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.10",
@@ -32,5 +32,6 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
-  }
+  },
+  "license": "AGPL-3.0-only"
 }

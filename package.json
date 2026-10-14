@@ -4,14 +4,20 @@
   "version": "0.1.0",
   "license": "AGPL-3.0-only",
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
-  "engines": { "node": ">=22" },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "npm run dev -w @openpers/server & npm run dev -w @openpers/web",
+    "dev:server": "npm run dev -w @openpers/server",
+    "dev:web": "npm run dev -w @openpers/web",
     "build": "npm run build -w @openpers/web && npm run build -w @openpers/server",
-    "start": "node apps/server/dist/index.js",
+    "start": "node --env-file-if-exists=.env apps/server/dist/index.js",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "seed:demo": "npm run seed:demo -w @openpers/server"
+    "seed:demo": "node --env-file-if-exists=.env apps/server/dist/seed-demo.js"
   }
 }
