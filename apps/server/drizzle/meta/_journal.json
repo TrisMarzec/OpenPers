@@ -15,6 +15,13 @@
       "when": 1792006586878,
       "tag": "0001_absence",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792006844520,
+      "tag": "0002_time",
+      "breakpoints": true
     }
   ]
 }
