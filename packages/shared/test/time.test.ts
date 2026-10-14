@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkArbZG, computeTimeBalance } from '../src/time';
+import { checkArbZG, computeTimeBalance, requiredBreakMinutes } from '../src/time';
 import type { ScheduleVersion } from '../src/dates';
 
 const w = (start: string, end: string) => ({ start: `2026-06-08T${start}:00`, end: `2026-06-08T${end}:00` });
@@ -23,6 +23,27 @@ describe('checkArbZG', () => {
   it('warns when rest period since previous day is under 11h', () => {
     const codes = checkArbZG([w('06:00', '10:00')], '2026-06-07T22:00:00').map((x) => x.code);
     expect(codes).toEqual(['REST_11H']);
+  });
+});
+
+describe('requiredBreakMinutes', () => {
+  it.each([
+    [360, 0],
+    [361, 30],
+    [540, 30],
+    [541, 45],
+  ])('needs %i min work → %i min break', (work, br) => {
+    expect(requiredBreakMinutes(work)).toBe(br);
+  });
+});
+
+describe('checkArbZG with recorded break minutes', () => {
+  it('counts break minutes inside a work entry', () => {
+    // 08:00–16:30 with 30 min break recorded on the entry = 8h work, compliant
+    expect(checkArbZG([{ ...w('08:00', '16:30'), breakMinutes: 30 }])).toEqual([]);
+  });
+  it('still warns when the recorded break is too short', () => {
+    expect(checkArbZG([{ ...w('08:00', '17:00'), breakMinutes: 15 }]).map((x) => x.code)).toEqual(['BREAK_6H']);
   });
 });
 

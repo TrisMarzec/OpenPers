@@ -12,19 +12,29 @@ export interface WorkInterval {
   /** Local date-time `YYYY-MM-DDTHH:mm:ss` without offset. */
   start: string;
   end: string;
+  /** Unpaid break recorded inside this interval. */
+  breakMinutes?: number;
 }
 
 const minutes = (from: string, to: string) => (Date.parse(`${to}Z`) - Date.parse(`${from}Z`)) / 60_000;
 
+/** Statutory minimum break for a day's working time (ArbZG §4). */
+export function requiredBreakMinutes(workMinutes: number): number {
+  if (workMinutes > 9 * 60) return 45;
+  if (workMinutes > 6 * 60) return 30;
+  return 0;
+}
+
 /**
  * Checks one day's WORK intervals against the German Working Hours Act (ArbZG §§3–5).
- * Breaks are the gaps between work intervals; only segments of ≥ 15 minutes count (§4).
- * Returns warnings only – OpenPers never blocks time entries.
+ * Breaks are the gaps between work intervals plus recorded break minutes; only segments
+ * of ≥ 15 minutes count (§4). Returns warnings only – OpenPers never blocks time entries.
  */
 export function checkArbZG(work: WorkInterval[], previousWorkEnd?: string): ArbZGWarning[] {
   const sorted = [...work].sort((a, b) => a.start.localeCompare(b.start));
-  const workMin = sorted.reduce((s, p) => s + minutes(p.start, p.end), 0);
-  let breakMin = 0;
+  const recordedBreaks = sorted.reduce((s, p) => s + ((p.breakMinutes ?? 0) >= 15 ? p.breakMinutes! : 0), 0);
+  const workMin = sorted.reduce((s, p) => s + minutes(p.start, p.end) - (p.breakMinutes ?? 0), 0);
+  let breakMin = recordedBreaks;
   for (let i = 1; i < sorted.length; i++) {
     const gap = minutes(sorted[i - 1].end, sorted[i].start);
     if (gap >= 15) breakMin += gap;
