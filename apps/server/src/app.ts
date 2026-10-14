@@ -67,9 +67,16 @@ export async function buildApp(overrides: Partial<Config> = {}): Promise<Fastify
 
   const webDist = config.webDistDir ?? [join(process.cwd(), 'apps/web/dist'), join(process.cwd(), '../web/dist')].find((d) => existsSync(join(d, 'index.html')));
   if (webDist && existsSync(join(webDist, 'index.html'))) {
-    await app.register(fastifyStatic, { root: webDist, wildcard: false });
+    await app.register(fastifyStatic, {
+      root: webDist,
+      wildcard: true,
+      setHeaders: (res, path) => {
+        // Vite emits content-hashed file names below assets/, so they can be cached forever.
+        if (/[\\/]assets[\\/]/.test(path)) res.header('cache-control', 'public, max-age=31536000, immutable');
+      },
+    });
     app.setNotFoundHandler((request, reply) => {
-      if (request.url.startsWith('/api/') || request.method !== 'GET') {
+      if (request.url.startsWith('/api/') || request.url.startsWith('/assets/') || request.method !== 'GET') {
         return reply.code(404).type('application/problem+json').send(problem(404, 'Not found'));
       }
       return reply.sendFile('index.html');

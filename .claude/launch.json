@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "openpers",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["--env-file=.env.dev", "--import", "tsx", "apps/server/src/index.ts"],
+      "port": 3000
+    }
+  ]
+}

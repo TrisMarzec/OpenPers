@@ -72,6 +72,14 @@ describe('time tracking', () => {
     expect(bal.body).toMatchObject({ targetMinutes: 960, workedMinutes: 1050, balanceMinutes: 90 });
   });
 
+  it('does not count the unfinished current day in the default balance', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const emp = await newEmployee('Neu', today);
+    const bal = await emp.client.get(`/api/v1/persons/${emp.personId}/time-balance`);
+    expect(bal.status).toBe(200);
+    expect(bal.body.balanceMinutes).toBe(0);
+  });
+
   it('requires approval when configured and lets managers approve', async () => {
     expect((await admin.patch('/api/v1/time-settings', { approvalRequired: true })).status).toBe(200);
     const emp = await newEmployee('Paul');

@@ -270,10 +270,12 @@ export const timeModule: OpenPersModule = {
       { method: 'GET', url: '/api/v1/persons/:id/time-balance', tag: 'time', summary: 'Target vs. worked time (overtime balance)', query: z.object({ from: isoDateSchema.optional(), to: isoDateSchema.optional() }) },
       async ({ user, params, query }) => {
         await authz.assert(user, 'time.read', params.id);
-        const to = query.to ?? new Date().toISOString().slice(0, 10);
+        // By default the balance runs until yesterday: the current day is not finished yet.
+        const to = query.to ?? addDays(new Date().toISOString().slice(0, 10), -1);
         const emp = await currentEmployment(db, params.id, to);
         const from = query.from ?? emp?.startDate ?? to;
-        if (from > to) throw unprocessable('Invalid range', [{ path: 'from', message: 'from must not be after to' }]);
+        if (query.from && query.to && from > to) throw unprocessable('Invalid range', [{ path: 'from', message: 'from must not be after to' }]);
+        if (from > to) return { from, to, targetMinutes: 0, workedMinutes: 0, balanceMinutes: 0 };
         const region = (await regionOf(db, params.id, to)) as Region;
         const schedules = await schedulesOf(db, params.id);
         const absenceRows = await db

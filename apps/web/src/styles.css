@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+@import '@fontsource/atkinson-hyperlegible-next/400.css';
+@import '@fontsource/atkinson-hyperlegible-next/600.css';
+@import '@fontsource/atkinson-hyperlegible-next/700.css';
+
+/*
+ * OpenPers design tokens — "time card & stamp ink".
+ * Cool paper, navy ink, stamp blue for actions, stamp red for refusals.
+ */
+@theme {
+  --font-sans: 'Atkinson Hyperlegible Next', ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #f6f7f9;
+  --color-sheet: #ffffff;
+  --color-ink: #16233f;
+  --color-ink-soft: #4a5671;
+  --color-ink-faint: #7a849a;
+  --color-rule: #d6dce6;
+  --color-rule-soft: #e9edf3;
+
+  --color-stamp: #2340c8;
+  --color-stamp-dark: #1a309a;
+  --color-stamp-wash: #e8ecfb;
+  --color-refuse: #b42b23;
+  --color-refuse-wash: #fbeceb;
+  --color-grant: #1d6e47;
+  --color-grant-wash: #e6f3ec;
+  --color-wait: #8a5a00;
+  --color-wait-wash: #fdf3dc;
+
+  --radius-ctl: 6px;
+}
+
+html {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-paper);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-stamp);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Stamp: the one recurring ornament — status marks look inked, not pill-shaped. */
+.stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  padding: 0 0.45em;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.55;
+  white-space: nowrap;
+}
+
+/* Punch card perforation used by the clock widget. */
+.perforated {
+  background-image: radial-gradient(circle at 6px 50%, var(--color-paper) 3.5px, transparent 4px);
+  background-size: 12px 18px;
+  background-repeat: repeat-y;
+}
+
+dialog::backdrop {
+  background: rgb(22 35 63 / 0.35);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
