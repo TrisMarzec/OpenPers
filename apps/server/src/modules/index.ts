@@ -7,8 +7,10 @@ import { documentsModule } from './documents';
 import { recruitingModule } from './recruiting';
 import { workflowModule } from './workflow';
 import { analyticsModule } from './analytics';
+import { performanceModule } from './performance';
+import { surveysModule } from './surveys';
 
 /** Feature modules in registration order. Core is registered separately by the app. */
 export function featureModules(): OpenPersModule[] {
-  return [orgModule, peopleModule, absenceModule, timeModule, documentsModule, recruitingModule, workflowModule, analyticsModule];
+  return [orgModule, peopleModule, absenceModule, timeModule, documentsModule, recruitingModule, workflowModule, analyticsModule, performanceModule, surveysModule];
 }

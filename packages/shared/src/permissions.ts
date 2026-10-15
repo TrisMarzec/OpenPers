@@ -22,6 +22,8 @@ export const PERMISSIONS = [
   'webhooks.manage',
   'checklists.manage',
   'analytics.read',
+  'performance.manage',
+  'surveys.manage',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -40,7 +42,7 @@ export const SCOPES: Scope[] = ['all', 'org_unit', 'reports', 'self'];
  * Sensitive person data is grouped into categories. Each role grants a level per category,
  * separately for the user's own profile (`self`) and for other persons in the role's scope (`others`).
  */
-export const DATA_CATEGORIES = ['profile', 'contact', 'personal', 'employment', 'compensation', 'payroll'] as const;
+export const DATA_CATEGORIES = ['profile', 'contact', 'personal', 'employment', 'compensation', 'payroll', 'performance'] as const;
 export type DataCategory = (typeof DATA_CATEGORIES)[number];
 
 export const ACCESS_LEVELS = ['none', 'view', 'edit'] as const;
@@ -77,7 +79,7 @@ export const PERSON_FIELD_CATEGORY: Record<string, DataCategory> = {
 
 const all = (self: AccessLevel, others: AccessLevel): FieldAccess => Object.fromEntries(DATA_CATEGORIES.map((c) => [c, { self, others }])) as FieldAccess;
 
-const EMPLOYEE_SELF: Record<DataCategory, AccessLevel> = { profile: 'view', contact: 'edit', personal: 'edit', employment: 'view', compensation: 'view', payroll: 'edit' };
+const EMPLOYEE_SELF: Record<DataCategory, AccessLevel> = { profile: 'view', contact: 'edit', personal: 'edit', employment: 'view', compensation: 'view', payroll: 'edit', performance: 'view' };
 
 const fieldAccess = (others: Partial<CategoryAccess>): FieldAccess =>
   Object.fromEntries(DATA_CATEGORIES.map((c) => [c, { self: EMPLOYEE_SELF[c], others: others[c] ?? 'none' }])) as FieldAccess;
@@ -104,7 +106,8 @@ export const BUILTIN_ROLES: RoleDefinition[] = [
     name: 'Führungskraft',
     permissions: ['people.read', 'absence.read', 'absence.approve', 'time.read', 'time.approve', 'documents.read', 'recruiting.read'],
     defaultScope: 'reports',
-    fieldAccess: fieldAccess({ profile: 'view', contact: 'view', employment: 'view' }),
+    // Managers write reviews and maintain goals of their team.
+    fieldAccess: fieldAccess({ profile: 'view', contact: 'view', employment: 'view', performance: 'edit' }),
   },
   {
     key: 'employee',

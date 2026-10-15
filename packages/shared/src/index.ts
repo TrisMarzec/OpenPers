@@ -5,3 +5,4 @@ export * from './time';
 export * from './permissions';
 export * from './org';
 export * from './analytics';
+export * from './feedback';
