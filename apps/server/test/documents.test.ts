@@ -1,20 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { createEmployee, createTestApp, setupCompany, type Client } from './helpers';
-
-function multipart(fields: Record<string, string>, file?: { name: string; type: string; data: Buffer }) {
-  const boundary = `----openpers${Math.random().toString(16).slice(2)}`;
-  const parts: Buffer[] = [];
-  for (const [k, v] of Object.entries(fields)) {
-    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`));
-  }
-  if (file) {
-    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.name}"\r\nContent-Type: ${file.type}\r\n\r\n`));
-    parts.push(file.data, Buffer.from('\r\n'));
-  }
-  parts.push(Buffer.from(`--${boundary}--\r\n`));
-  return { payload: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
-}
+import { createEmployee, createTestApp, multipart, setupCompany, type Client } from './helpers';
 
 const PDF = Buffer.from('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
 

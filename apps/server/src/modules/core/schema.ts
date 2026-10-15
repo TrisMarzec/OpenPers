@@ -10,6 +10,9 @@ export const company = pgTable('company', {
   locale: text('locale').notNull().default('de'),
   timezone: text('timezone').notNull().default('Europe/Berlin'),
   settings: jsonb('settings').$type<Record<string, unknown>>().notNull().default({}),
+  logoKey: text('logo_key'),
+  logoMime: text('logo_mime'),
+  logoUpdatedAt: timestamp('logo_updated_at', { withTimezone: true }),
   createdAt: createdAt(),
 });
 

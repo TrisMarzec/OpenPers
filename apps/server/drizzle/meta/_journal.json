@@ -64,6 +64,13 @@
       "when": 1792086326837,
       "tag": "0008_performance_surveys",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792099964158,
+      "tag": "0009_photos_logo",
+      "breakpoints": true
     }
   ]
 }

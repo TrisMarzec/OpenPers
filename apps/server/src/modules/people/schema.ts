@@ -18,7 +18,11 @@ export const persons = pgTable(
     privateAddress: text('private_address'),
     emergencyContact: text('emergency_contact'),
     language: text('language').notNull().default('de'),
+    /** Legacy, unused. Photos live in content-addressed storage (photoKey). */
     photoDocumentId: uuid('photo_document_id'),
+    photoKey: text('photo_key'),
+    photoMime: text('photo_mime'),
+    photoUpdatedAt: timestamp('photo_updated_at', { withTimezone: true }),
     anonymizedAt: timestamp('anonymized_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

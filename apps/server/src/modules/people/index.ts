@@ -24,6 +24,7 @@ import { decodeCursor, makeRoute, page, paginationQuery } from '../../lib/api';
 import type { Principal } from '../../lib/authz';
 import { audit, diff, emit, type AppContext, type OpenPersModule } from '../../lib/context';
 import { forbidden, notFound, unprocessable } from '../../lib/errors';
+import { photoUrl, readImageUpload, releaseFile, sendImage } from '../../lib/images';
 import { createPersonInput, createPersonWithEmployment, employmentInput, isoDateSchema, personInput, weeklyHoursSchema } from './service';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -76,7 +77,7 @@ function pickCurrent<T extends { startDate: string; endDate: string | null }>(li
 export const peopleModule: OpenPersModule = {
   name: 'people',
   register(app, ctx: AppContext) {
-    const { db, authz, cipher } = ctx;
+    const { db, authz, cipher, storage } = ctx;
     const route = makeRoute(app, ctx.registry);
     registerCompensationRoutes(app, ctx);
 
@@ -134,7 +135,8 @@ export const peopleModule: OpenPersModule = {
       const supIds = [...new Set(emps.map((e) => e.supervisorPersonId).filter(Boolean))] as string[];
       const sups = supIds.length ? await db.select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName }).from(persons).where(inArray(persons.id, supIds)) : [];
       const [account] = await db.select({ id: users.id, email: users.email, active: users.active }).from(users).where(eq(users.personId, id));
-      const person: Record<string, unknown> = { ...p };
+      const { photoKey: _k, photoMime: _m, photoUpdatedAt: _u, photoDocumentId: _d, ...rest } = p;
+      const person: Record<string, unknown> = { ...rest, photoUrl: photoUrl(p) };
       for (const [field, cat] of Object.entries(PERSON_FIELD_CATEGORY)) if (!atLeast(access[cat], 'view')) delete person[field];
       const fullEmployment = atLeast(access.employment, 'view');
       const employments = emps.map((e) => {
@@ -162,7 +164,7 @@ export const peopleModule: OpenPersModule = {
     // ---------- Directory ----------
     route({ method: 'GET', url: '/api/v1/directory', tag: 'people', summary: 'Company directory (basic fields, all employees)' }, async () => {
       await applyDueEmploymentChanges(db);
-      const list = await db.select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, preferredName: persons.preferredName, email: persons.email, photoDocumentId: persons.photoDocumentId }).from(persons).where(isNull(persons.anonymizedAt)).orderBy(asc(persons.lastName), asc(persons.firstName));
+      const list = await db.select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, preferredName: persons.preferredName, email: persons.email, photoUpdatedAt: persons.photoUpdatedAt }).from(persons).where(isNull(persons.anonymizedAt)).orderBy(asc(persons.lastName), asc(persons.firstName));
       const emps = await employmentsOf(list.map((p) => p.id));
       const wps = await db.select().from(workplaces);
       return {
@@ -170,7 +172,8 @@ export const peopleModule: OpenPersModule = {
           .map((p) => {
             const e = pickCurrent(emps.filter((x) => x.personId === p.id));
             if (!e || e.status === 'INACTIVE') return null;
-            return { ...p, positionTitle: e.positionTitle, status: e.status, orgUnits: e.orgUnits, supervisorPersonId: e.supervisorPersonId, workplace: wps.find((w) => w.id === e.workplaceId)?.name ?? null };
+            const { photoUpdatedAt: _u, ...base } = p;
+            return { ...base, photoUrl: photoUrl(p), positionTitle: e.positionTitle, status: e.status, orgUnits: e.orgUnits, supervisorPersonId: e.supervisorPersonId, workplace: wps.find((w) => w.id === e.workplaceId)?.name ?? null };
           })
           .filter(Boolean),
       };
@@ -205,7 +208,7 @@ export const peopleModule: OpenPersModule = {
             lastName: p.lastName,
             preferredName: p.preferredName,
             email: p.email,
-            photoDocumentId: p.photoDocumentId,
+            photoUrl: photoUrl(p),
             employmentId: e?.id ?? null,
             positionTitle: e?.positionTitle ?? null,
             status: e?.status ?? null,
@@ -236,6 +239,35 @@ export const peopleModule: OpenPersModule = {
       return detail(user, params.id);
     });
 
+    // ---------- Photo ----------
+    route({ method: 'GET', url: '/api/v1/persons/:id/photo', tag: 'people', summary: 'Profile photo (404 if none)' }, async ({ params }, reply) => {
+      const p = await loadPerson(params.id);
+      if (!p.photoKey || !p.photoMime || p.anonymizedAt) throw notFound('No photo');
+      return sendImage(reply, storage, p.photoKey, p.photoMime, 'private');
+    });
+    /** Own photo always; others need edit access to their basic data (profile category). */
+    async function assertPhotoEdit(user: Principal, personId: string) {
+      if (user.personId === personId) return;
+      if (!atLeast((await authz.categoryAccess(user, personId)).profile, 'edit')) throw forbidden();
+    }
+    route({ method: 'PUT', url: '/api/v1/persons/:id/photo', tag: 'people', summary: 'Upload a profile photo (multipart: file; PNG, JPEG or WebP, max. 2 MB)' }, async ({ user, params, raw }) => {
+      const before = await loadPerson(params.id);
+      await assertPhotoEdit(user, params.id);
+      const img = await readImageUpload(raw, false);
+      const file = await storage.put(img.data);
+      const [p] = await db.update(persons).set({ photoKey: file.key, photoMime: img.mime, photoUpdatedAt: new Date() }).where(eq(persons.id, params.id)).returning();
+      await audit(db, user.userId, 'person', params.id, 'photo_update');
+      if (before.photoKey !== file.key) await releaseFile(db, storage, before.photoKey);
+      return { photoUrl: photoUrl(p) };
+    });
+    route({ method: 'DELETE', url: '/api/v1/persons/:id/photo', tag: 'people', summary: 'Remove the profile photo' }, async ({ user, params }) => {
+      const before = await loadPerson(params.id);
+      await assertPhotoEdit(user, params.id);
+      await db.update(persons).set({ photoKey: null, photoMime: null, photoUpdatedAt: null }).where(eq(persons.id, params.id));
+      await audit(db, user.userId, 'person', params.id, 'photo_delete');
+      await releaseFile(db, storage, before.photoKey);
+    });
+
     route({ method: 'PATCH', url: '/api/v1/persons/:id', tag: 'people', summary: 'Update personal data', body: personInput.partial() }, async ({ user, params, body }) => {
       // Every changed field needs `edit` on its data category (own profile or others in scope).
       const categories = [...new Set(Object.keys(body).map((k) => PERSON_FIELD_CATEGORY[k]).filter(Boolean))] as DataCategory[];
@@ -251,11 +283,11 @@ export const peopleModule: OpenPersModule = {
 
     route({ method: 'POST', url: '/api/v1/persons/:id/anonymize', tag: 'people', summary: 'Anonymize a person (DSGVO Art. 17)' }, async ({ user, params }) => {
       if ((await authz.visiblePersonIds(user, 'people.write')) !== 'all') throw forbidden();
-      await loadPerson(params.id);
+      const before = await loadPerson(params.id);
       await db.transaction(async (tx) => {
         await tx
           .update(persons)
-          .set({ firstName: 'Anonymisiert', lastName: params.id.slice(0, 8), preferredName: null, email: `anonymized-${params.id}@invalid.local`, gender: 'UNKNOWN', birthDate: null, phone: null, privateAddress: null, emergencyContact: null, photoDocumentId: null, anonymizedAt: new Date(), updatedAt: new Date() })
+          .set({ firstName: 'Anonymisiert', lastName: params.id.slice(0, 8), preferredName: null, email: `anonymized-${params.id}@invalid.local`, gender: 'UNKNOWN', birthDate: null, phone: null, privateAddress: null, emergencyContact: null, photoDocumentId: null, photoKey: null, photoMime: null, photoUpdatedAt: null, anonymizedAt: new Date(), updatedAt: new Date() })
           .where(eq(persons.id, params.id));
         await tx.delete(attributeValues).where(eq(attributeValues.personId, params.id));
         const accounts = await tx.update(users).set({ active: false, email: `anonymized-${params.id}@invalid.local`, passwordHash: null }).where(eq(users.personId, params.id)).returning({ id: users.id });
@@ -264,6 +296,7 @@ export const peopleModule: OpenPersModule = {
         await audit(tx, user.userId, 'person', params.id, 'anonymize');
         await emit(tx, 'person.anonymized', { personId: params.id });
       });
+      await releaseFile(db, storage, before.photoKey);
       return detail(user, params.id);
     });
 

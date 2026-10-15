@@ -99,3 +99,18 @@ export async function createEmployee(
   if (u.status !== 201) throw new Error(`create user failed ${u.status} ${JSON.stringify(u.body)}`);
   return { personId: p.body.id, userId: u.body.id, client: await login(app, email, 'password-123456'), email };
 }
+
+/** Builds a multipart/form-data body for app.inject. */
+export function multipart(fields: Record<string, string>, file?: { name: string; type: string; data: Buffer }) {
+  const boundary = `----openpers${Math.random().toString(16).slice(2)}`;
+  const parts: Buffer[] = [];
+  for (const [k, v] of Object.entries(fields)) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`));
+  }
+  if (file) {
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.name}"\r\nContent-Type: ${file.type}\r\n\r\n`));
+    parts.push(file.data, Buffer.from('\r\n'));
+  }
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+  return { payload: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
+}

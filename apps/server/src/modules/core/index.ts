@@ -8,6 +8,7 @@ import { audit, diff, type AppContext, type OpenPersModule } from '../../lib/con
 import { hashPassword, randomToken, sha256, verifyPassword } from '../../lib/crypto';
 import { conflict, forbidden, HttpError, notFound, unauthorized, unprocessable } from '../../lib/errors';
 import { createPersonWithEmployment } from '../people/service';
+import { logoUrl, photoUrl, readImageUpload, releaseFile, sendImage } from '../../lib/images';
 import { loadPrincipal, resolveFieldAccess, SESSION_COOKIE, SESSION_DAYS } from './principal';
 import { registerWebhookRoutes } from './webhooks';
 import type { Principal } from '../../lib/authz';
@@ -50,11 +51,16 @@ async function userView(db: Exec, id: string) {
   return { id: u.id, email: u.email, personId: u.personId, locale: u.locale, active: u.active, lastLoginAt: u.lastLoginAt, roles: assigned, createdAt: u.createdAt };
 }
 
+/** Company settings without storage internals, with the public logo URL. */
+function companyView({ logoKey: _k, logoMime: _m, logoUpdatedAt, ...c }: typeof company.$inferSelect) {
+  return { ...c, logoUrl: logoUrl({ logoUpdatedAt }) };
+}
+
 export function coreModule(modules: OpenPersModule[]): OpenPersModule {
   return {
     name: 'core',
     register(app, ctx: AppContext) {
-      const { db } = ctx;
+      const { db, storage } = ctx;
       const route = makeRoute(app, ctx.registry);
       registerWebhookRoutes(app, ctx);
 
@@ -132,8 +138,8 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
       });
 
       async function meView(p: Principal) {
-        const [person] = p.personId ? await db.select({ firstName: persons.firstName, lastName: persons.lastName, preferredName: persons.preferredName }).from(persons).where(eq(persons.id, p.personId)) : [];
-        return { id: p.userId, email: p.email, personId: p.personId, locale: p.locale, permissions: p.permissions, person: person ?? null };
+        const [person] = p.personId ? await db.select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, preferredName: persons.preferredName, photoUpdatedAt: persons.photoUpdatedAt }).from(persons).where(eq(persons.id, p.personId)) : [];
+        return { id: p.userId, email: p.email, personId: p.personId, locale: p.locale, permissions: p.permissions, person: person ? { firstName: person.firstName, lastName: person.lastName, preferredName: person.preferredName, photoUrl: photoUrl(person) } : null };
       }
 
       route({ method: 'GET', url: '/api/v1/auth/me', tag: 'auth', summary: 'Current user and permissions' }, ({ user }) => meView(user));
@@ -301,7 +307,33 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
       route({ method: 'GET', url: '/api/v1/company', tag: 'company', summary: 'Company settings' }, async () => {
         const [c] = await db.select().from(company).limit(1);
         if (!c) throw notFound('Setup not completed');
-        return c;
+        return companyView(c);
+      });
+      route({ method: 'GET', url: '/api/v1/public/company', auth: false, tag: 'company', summary: 'Public company branding (name, logo) for login and careers pages' }, async () => {
+        const [c] = await db.select().from(company).limit(1);
+        return { name: c?.name ?? null, logoUrl: c ? logoUrl(c) : null };
+      });
+      route({ method: 'GET', url: '/api/v1/public/logo', auth: false, tag: 'company', summary: 'Company logo (404 if none)' }, async (_req, reply) => {
+        const [c] = await db.select().from(company).limit(1);
+        if (!c?.logoKey || !c.logoMime) throw notFound('No logo');
+        return sendImage(reply, storage, c.logoKey, c.logoMime, 'public');
+      });
+      route({ method: 'PUT', url: '/api/v1/company/logo', perm: 'settings.manage', tag: 'company', summary: 'Upload the company logo (multipart: file; PNG, JPEG, WebP or SVG, max. 2 MB)' }, async ({ user, raw }) => {
+        const [c] = await db.select().from(company).limit(1);
+        if (!c) throw notFound('Setup not completed');
+        const img = await readImageUpload(raw, true);
+        const file = await storage.put(img.data);
+        const [u] = await db.update(company).set({ logoKey: file.key, logoMime: img.mime, logoUpdatedAt: new Date() }).where(eq(company.id, c.id)).returning();
+        await audit(db, user.userId, 'company', c.id, 'logo_update');
+        if (c.logoKey !== file.key) await releaseFile(db, storage, c.logoKey);
+        return companyView(u);
+      });
+      route({ method: 'DELETE', url: '/api/v1/company/logo', perm: 'settings.manage', tag: 'company', summary: 'Remove the company logo' }, async ({ user }) => {
+        const [c] = await db.select().from(company).limit(1);
+        if (!c) throw notFound('Setup not completed');
+        await db.update(company).set({ logoKey: null, logoMime: null, logoUpdatedAt: null }).where(eq(company.id, c.id));
+        await audit(db, user.userId, 'company', c.id, 'logo_delete');
+        await releaseFile(db, storage, c.logoKey);
       });
       route(
         {
@@ -317,7 +349,7 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
           const patch = { ...body, ...(body.settings ? { settings: { ...c.settings, ...body.settings } } : {}) };
           const [u] = await db.update(company).set(patch).where(eq(company.id, c.id)).returning();
           await audit(db, user.userId, 'company', c.id, 'update', diff(c, patch));
-          return u;
+          return companyView(u);
         },
       );
 
