@@ -7,6 +7,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { fmtDate, fullName, initials, todayISO } from '../lib/format';
 import { AbsenceDialog } from '../components/AbsenceDialog';
+import { PersonPerformance } from '../components/Performance';
 import { Avatar, Button, Checkbox, Dialog, Field, Input, Section, Select, Spinner, Stamp, Table, Tabs, Textarea, useErrorText, useToast } from '../components/ui';
 import { AbsenceList, BalanceTable } from './Absences';
 import { DocumentList } from './Documents';
@@ -15,7 +16,7 @@ import { AttendanceList } from '../components/AttendanceList';
 import { PersonChecklists } from '../components/Checklists';
 import { CategoryForm, CompensationSection, OwnAccountSection, ProfileOverview, type Access } from '../components/Profile';
 
-type Tab = 'overview' | 'checklists' | 'personal' | 'employment' | 'compensation' | 'payroll' | 'absences' | 'time' | 'documents' | 'account';
+type Tab = 'overview' | 'checklists' | 'personal' | 'employment' | 'compensation' | 'payroll' | 'absences' | 'time' | 'documents' | 'performance' | 'account';
 
 function EmploymentTab({ person, canWrite }: { person: any; canWrite: boolean }) {
   const { t } = useTranslation();
@@ -350,6 +351,7 @@ export function PersonPage({ selfView = false }: { selfView?: boolean }) {
           { value: 'payroll', label: t('categories.payroll'), hidden: access.payroll === 'none' },
           { value: 'absences', label: t('person.tabs.absences'), hidden: !can('absence.read') },
           { value: 'time', label: t('person.tabs.time'), hidden: !can('time.read') },
+          { value: 'performance', label: t('categories.performance'), hidden: !access.performance || access.performance === 'none' },
           { value: 'documents', label: t('person.tabs.documents'), hidden: !can('documents.read') && !can('documents.write') },
           { value: 'account', label: t('person.tabs.account'), hidden: !self && !can('users.manage') },
         ]}
@@ -376,6 +378,7 @@ export function PersonPage({ selfView = false }: { selfView?: boolean }) {
       )}
       {tab === 'time' && <AttendanceList personId={p.id} editable={can('time.manage') || (self && can('time.track'))} />}
       {tab === 'documents' && <DocumentList personId={p.id} />}
+      {tab === 'performance' && <PersonPerformance person={p} />}
       {tab === 'account' && (self ? <OwnAccountSection /> : <AccountTab person={p} />)}
     </div>
   );

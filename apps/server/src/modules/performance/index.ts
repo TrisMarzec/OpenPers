@@ -251,7 +251,7 @@ export const performanceModule: OpenPersModule = {
       if (!atLeast(await access(user, params.id), 'view')) throw forbidden();
       const ids = [...new Set((await db.select({ cycleId: reviews.cycleId }).from(reviews).where(eq(reviews.revieweeId, params.id))).map((r) => r.cycleId))];
       const items = ids.length ? await db.select().from(reviewCycles).where(inArray(reviewCycles.id, ids)).orderBy(desc(reviewCycles.createdAt)) : [];
-      return { items: items.map(({ id, name, status, periodStart, periodEnd, dueDate }) => ({ id, name, status, periodStart, periodEnd, dueDate })) };
+      return { items: items.map(({ id, name, status, periodStart, periodEnd, dueDate, peerReview }) => ({ id, name, status, periodStart, periodEnd, dueDate, peerReview })) };
     });
 
     route({ method: 'POST', url: '/api/v1/review-cycles/:id/release', tag: 'performance', summary: 'Share the results with the reviewee', body: z.object({ personId: z.string().uuid() }) }, async ({ user, params, body }) => {
@@ -313,7 +313,10 @@ export const performanceModule: OpenPersModule = {
       if (!target) throw notFound();
       const [f] = await db.transaction(async (tx) => {
         const r = await tx.insert(feedback).values({ personId: params.id, authorPersonId: user.personId, kind: body.kind, text: body.text }).returning();
-        if (body.kind === 'praise') await notify(tx, [await userOfPerson(tx, params.id)], 'praise_received', {}, '/me');
+        if (body.kind === 'praise') {
+          const [a] = await tx.select({ firstName: persons.firstName, lastName: persons.lastName }).from(persons).where(eq(persons.id, user.personId!));
+          await notify(tx, [await userOfPerson(tx, params.id)], 'praise_received', { authorName: a ? a.firstName + ' ' + a.lastName : '' }, '/performance?tab=feedback');
+        }
         return r;
       });
       reply.code(201);

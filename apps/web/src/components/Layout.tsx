@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, CalendarDays, Clock, FileText, ChartColumn, CircleUser, ListChecks, LayoutGrid, LogOut, Network, Menu, Settings, Users, X } from 'lucide-react';
+import { Briefcase, ClipboardList, Target, CalendarDays, Clock, FileText, ChartColumn, CircleUser, ListChecks, LayoutGrid, LogOut, Network, Menu, Settings, Users, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { setLanguage } from '../lib/i18n';
@@ -22,6 +22,10 @@ export function Layout() {
   const pending = approvals.data?.items.length ?? 0;
   const tasks = useQuery({ queryKey: ['tasks-mine'], queryFn: () => api.get('/tasks/mine'), refetchInterval: 120_000 });
   const openTasks = tasks.data?.items.length ?? 0;
+  const reviews = useQuery({ queryKey: ['reviews-mine'], queryFn: () => api.get('/reviews/mine'), enabled: !!me?.personId, refetchInterval: 300_000 });
+  const openReviews = (reviews.data?.items ?? []).filter((r: any) => r.status === 'pending' && r.cycle.status === 'active').length;
+  const surveys = useQuery({ queryKey: ['surveys-open'], queryFn: () => api.get('/surveys/open'), refetchInterval: 300_000 });
+  const openSurveys = (surveys.data?.items ?? []).filter((s: any) => !s.answered).length;
 
   const items = [
     { to: '/', label: t('nav.dashboard'), icon: LayoutGrid, show: true, end: true },
@@ -31,6 +35,8 @@ export function Layout() {
     { to: '/org', label: t('nav.org'), icon: Network, show: true },
     { to: '/absences', label: t('nav.absences'), icon: CalendarDays, show: true, badge: pending },
     { to: '/time', label: t('nav.time'), icon: Clock, show: can('time.track') || can('time.read') },
+    { to: '/performance', label: t('nav.performance'), icon: Target, show: !!me?.personId || can('performance.manage'), badge: openReviews },
+    { to: '/surveys', label: t('nav.surveys'), icon: ClipboardList, show: true, badge: openSurveys },
     { to: '/documents', label: t('nav.documents'), icon: FileText, show: !!me?.personId },
     { to: '/recruiting', label: t('nav.recruiting'), icon: Briefcase, show: can('recruiting.read') },
     { to: '/analytics', label: t('nav.analytics'), icon: ChartColumn, show: can('analytics.read') },
