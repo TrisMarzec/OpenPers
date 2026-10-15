@@ -20,6 +20,8 @@ export const PERMISSIONS = [
   'users.manage',
   'settings.manage',
   'webhooks.manage',
+  'checklists.manage',
+  'analytics.read',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
