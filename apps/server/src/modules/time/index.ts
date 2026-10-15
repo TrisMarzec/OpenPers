@@ -193,6 +193,8 @@ export const timeModule: OpenPersModule = {
     return { from, to, ...computeTimeBalance({ from, to, schedules, region, absences, worked, customHolidays }) };
     }
 
+    ctx.services.timeBalanceOf = (personId: string) => balanceOf(personId);
+
     // ---------- Settings ----------
     route({ method: 'GET', url: '/api/v1/time-settings', tag: 'time', summary: 'Time tracking settings' }, async () => {
       const { timezone: _, ...s } = await settings();

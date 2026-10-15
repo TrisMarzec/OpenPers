@@ -72,9 +72,20 @@ export async function deliverDue(db: DB): Promise<number> {
   return due.length;
 }
 
-/** Hooks for periodic maintenance jobs registered by modules (e.g. DSGVO retention). */
+/** Periodic maintenance jobs are registered per app on `ctx.maintenance` (e.g. DSGVO retention, reminders). */
 export type MaintenanceJob = (ctx: AppContext) => Promise<void>;
-export const maintenanceJobs: MaintenanceJob[] = [];
+
+/** Runs every maintenance job once; a failing job does not stop the others. */
+export async function runMaintenance(ctx: AppContext, log?: { error: (o: unknown, msg?: string) => void }): Promise<void> {
+  for (const job of ctx.maintenance) {
+    try {
+      await job(ctx);
+    } catch (err) {
+      if (log) log.error(err, 'maintenance job failed');
+      else throw err;
+    }
+  }
+}
 
 export async function runWorkerOnce(ctx: AppContext): Promise<void> {
   await dispatchOutbox(ctx.db);
@@ -94,15 +105,7 @@ export function startWorker(ctx: AppContext, log: { error: (o: unknown, msg?: st
       running = false;
     }
   };
-  const maintenance = async () => {
-    for (const job of maintenanceJobs) {
-      try {
-        await job(ctx);
-      } catch (err) {
-        log.error(err, 'maintenance job failed');
-      }
-    }
-  };
+  const maintenance = () => runMaintenance(ctx, log);
   const t1 = setInterval(tick, 5_000);
   const t2 = setInterval(maintenance, 60 * 60_000);
   setTimeout(maintenance, 10_000).unref();

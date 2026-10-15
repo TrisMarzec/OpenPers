@@ -16,7 +16,8 @@ import { LocalStorage } from './lib/storage';
 import { coreModule } from './modules/core';
 import { registerAuthHook } from './modules/core/principal';
 import { featureModules } from './modules';
-import { maintenanceJobs, startWorker } from './lib/worker';
+import { startWorker } from './lib/worker';
+import { resetEventListeners } from './lib/context';
 import { applyDueEmploymentChanges } from './modules/people';
 import { anonymizeExpiredApplications, retentionMonths } from './modules/recruiting';
 
@@ -34,7 +35,7 @@ export async function buildApp(overrides: Partial<Config> = {}): Promise<Fastify
 
   const app = Fastify({ logger: config.logger ? { level: process.env.LOG_LEVEL ?? 'info' } : false, bodyLimit: 2 * 1024 * 1024, trustProxy: true });
   const registry: RouteRecord[] = [];
-  const ctx: AppContext = { db, config, authz: new Authz(db), cipher: new FieldCipher(config.secretKey), storage: new LocalStorage(config.storageDir), registry, exporters: {}, anonymizers: [] };
+  const ctx: AppContext = { db, config, authz: new Authz(db), cipher: new FieldCipher(config.secretKey), storage: new LocalStorage(config.storageDir), registry, exporters: {}, anonymizers: [], maintenance: [], services: {} };
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => close());
 
@@ -57,10 +58,12 @@ export async function buildApp(overrides: Partial<Config> = {}): Promise<Fastify
   });
 
   registerAuthHook(app, db);
+  resetEventListeners();
 
   const modules: OpenPersModule[] = featureModules();
   const all = [coreModule(modules), ...modules];
   for (const m of all) await m.register(app, ctx);
+  for (const m of all) await m.upgrade?.(ctx);
 
   app.get('/healthz', async () => ({ status: 'ok', version: config.version }));
   app.get('/api/v1/openapi.json', async () => buildOpenApi(registry, config.version));
@@ -85,14 +88,12 @@ export async function buildApp(overrides: Partial<Config> = {}): Promise<Fastify
     app.setNotFoundHandler((_req, reply) => reply.code(404).type('application/problem+json').send(problem(404, 'Not found')));
   }
 
-  if (!maintenanceJobs.length) {
-    maintenanceJobs.push(
-      async (c) => applyDueEmploymentChanges(c.db),
-      async (c) => {
-        await anonymizeExpiredApplications(c.db, await retentionMonths(c.db));
-      },
-    );
-  }
+  ctx.maintenance.push(
+    async (c) => applyDueEmploymentChanges(c.db),
+    async (c) => {
+      await anonymizeExpiredApplications(c.db, await retentionMonths(c.db));
+    },
+  );
   if (config.startWorker) {
     const stop = startWorker(ctx, app.log);
     app.addHook('onClose', async () => stop());
