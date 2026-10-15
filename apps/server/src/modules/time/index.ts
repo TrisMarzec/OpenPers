@@ -2,7 +2,7 @@ import { and, asc, eq, gte, inArray, isNull, lte, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { addDays, checkArbZG, computeTimeBalance, dailyTargetMinutes, holidayName, minimalCompliantBreak, weekdayIndex, type Region } from '@openpers/shared';
 import type { Exec } from '../../db';
-import { absencePeriods, absenceTypes, attendancePeriods, company, projects } from '../../db/schema';
+import { absencePeriods, absenceTypes, attendancePeriods, company, employmentOrgUnits, persons, projects } from '../../db/schema';
 import { makeRoute } from '../../lib/api';
 import type { Principal } from '../../lib/authz';
 import { audit, emit, type AppContext, type OpenPersModule } from '../../lib/context';
@@ -112,6 +112,87 @@ export const timeModule: OpenPersModule = {
       return checkArbZG(work, prev);
     }
 
+    /** One row per day of the month with target, actual, difference and context. */
+    async function monthData(personId: string, month: string) {
+    const from = `${month}-01`;
+    const to = addDays(`${addDays(from, 31).slice(0, 7)}-01`, -1);
+    const region = (await regionOf(db, personId, from)) as Region;
+    const [schedules, customHolidays, absences, periods] = await Promise.all([
+      schedulesOf(db, personId),
+      customHolidaysFor(db, region, from, to),
+      absencesByDay(personId, from, to),
+      db.select().from(attendancePeriods).where(and(eq(attendancePeriods.personId, personId), gte(attendancePeriods.date, addDays(from, -1)), lte(attendancePeriods.date, to))).orderBy(asc(attendancePeriods.startAt)),
+    ]);
+    const rows = periods.map(view);
+    const absenceList = [...absences].map(([date, a]) => ({ date, fraction: a.fraction }));
+    const days = [];
+    for (let date = from; date <= to; date = addDays(date, 1)) {
+      const own = rows.filter((r) => r.date === date && r.status !== 'rejected');
+      const work = own.filter((r) => r.type === 'WORK').sort((a, b) => a.startAt!.localeCompare(b.startAt!));
+      const { workedMinutes, breakMinutes } = summarizeDay(own);
+      const holiday = customHolidays.find((h) => h.date === date)?.name ?? holidayName(date, region) ?? null;
+      const targetMinutes = dailyTargetMinutes(date, { schedules, region, absences: absenceList, customHolidays });
+      const wd = weekdayIndex(date);
+      const prev = rows.filter((r) => r.type === 'WORK' && r.date === addDays(date, -1) && r.endAt).map((r) => r.endAt!).sort().pop();
+      const closed = work.filter((r) => r.endAt);
+      days.push({
+        date,
+        weekend: wd >= 5,
+        holiday,
+        absence: absences.get(date) ?? null,
+        targetMinutes,
+        start: work[0] ? work[0].startAt!.slice(11, 16) : null,
+        end: work.length && work[work.length - 1].endAt ? work[work.length - 1].endAt!.slice(11, 16) : null,
+        breakMinutes,
+        workedMinutes,
+        diffMinutes: workedMinutes - targetMinutes,
+        location: work.find((r) => r.location)?.location ?? null,
+        projectId: work.find((r) => r.projectId)?.projectId ?? null,
+        comment: work.find((r) => r.comment)?.comment ?? null,
+        status: work.some((r) => r.status === 'pending') ? 'pending' : work.length ? 'approved' : null,
+        running: work.some((r) => !r.endAt),
+        periodCount: work.length,
+        warnings: closed.length ? checkArbZG(closed.map((r) => ({ start: r.startAt!, end: r.endAt!, breakMinutes: r.breakMinutes })), prev) : [],
+      });
+    }
+    // Future days (and today, until something is recorded) are not "missing" hours yet.
+    const today = new Date().toISOString().slice(0, 10);
+    const totals = days.reduce(
+      (t, d) => ({ targetMinutes: t.targetMinutes + d.targetMinutes, workedMinutes: t.workedMinutes + d.workedMinutes, diffMinutes: t.diffMinutes + (d.date < today || d.workedMinutes > 0 ? d.diffMinutes : 0) }),
+      { targetMinutes: 0, workedMinutes: 0, diffMinutes: 0 },
+    );
+    return { month, days, totals };
+    }
+
+    /** Overtime balance: target vs. worked from employment start (or qFrom) until yesterday (or qTo). */
+    async function balanceOf(personId: string, qFrom?: string, qTo?: string) {
+    // By default the balance runs until yesterday: the current day is not finished yet.
+    const to = qTo ?? addDays(new Date().toISOString().slice(0, 10), -1);
+    const emp = await currentEmployment(db, personId, to);
+    const from = qFrom ?? emp?.startDate ?? to;
+    if (qFrom && qTo && from > to) throw unprocessable('Invalid range', [{ path: 'from', message: 'from must not be after to' }]);
+    if (from > to) return { from, to, targetMinutes: 0, workedMinutes: 0, balanceMinutes: 0 };
+    const region = (await regionOf(db, personId, to)) as Region;
+    const schedules = await schedulesOf(db, personId);
+    const absenceRows = await db
+      .select({ p: absencePeriods, t: absenceTypes })
+      .from(absencePeriods)
+      .innerJoin(absenceTypes, eq(absenceTypes.id, absencePeriods.typeId))
+      .where(and(eq(absencePeriods.personId, personId), eq(absencePeriods.status, 'approved'), lte(absencePeriods.startDate, to)));
+    const absences: { date: string; fraction: number }[] = [];
+    for (const { p, t } of absenceRows) {
+      for (const d of await breakdownFor(db, p, t)) {
+        if (d.date < from || d.date > to || d.scheduledHours === 0) continue;
+        const fraction = t.unit === 'DAY' ? (p.startHalf && d.date === p.startDate) || (p.endHalf && d.date === p.endDate) ? 0.5 : 1 : Math.min(1, d.amount / d.scheduledHours);
+        absences.push({ date: d.date, fraction });
+      }
+    }
+    const rows = await db.select().from(attendancePeriods).where(and(eq(attendancePeriods.personId, personId), eq(attendancePeriods.type, 'WORK'), gte(attendancePeriods.date, from), lte(attendancePeriods.date, to), ne(attendancePeriods.status, 'rejected')));
+    const worked = rows.filter((r) => r.endAt).map((r) => ({ date: r.date, minutes: minutesBetween(norm(r.startAt)!, norm(r.endAt)!) - r.breakMinutes }));
+    const customHolidays = await customHolidaysFor(db, region, from, to);
+    return { from, to, ...computeTimeBalance({ from, to, schedules, region, absences, worked, customHolidays }) };
+    }
+
     // ---------- Settings ----------
     route({ method: 'GET', url: '/api/v1/time-settings', tag: 'time', summary: 'Time tracking settings' }, async () => {
       const { timezone: _, ...s } = await settings();
@@ -193,54 +274,7 @@ export const timeModule: OpenPersModule = {
         const personId = query.personId ?? user.personId;
         if (!personId) throw unprocessable('personId required', [{ path: 'personId', message: 'Required' }]);
         await authz.assert(user, 'time.read', personId);
-        const from = `${query.month}-01`;
-        const to = addDays(`${addDays(from, 31).slice(0, 7)}-01`, -1);
-        const region = (await regionOf(db, personId, from)) as Region;
-        const [schedules, customHolidays, absences, periods] = await Promise.all([
-          schedulesOf(db, personId),
-          customHolidaysFor(db, region, from, to),
-          absencesByDay(personId, from, to),
-          db.select().from(attendancePeriods).where(and(eq(attendancePeriods.personId, personId), gte(attendancePeriods.date, addDays(from, -1)), lte(attendancePeriods.date, to))).orderBy(asc(attendancePeriods.startAt)),
-        ]);
-        const rows = periods.map(view);
-        const absenceList = [...absences].map(([date, a]) => ({ date, fraction: a.fraction }));
-        const days = [];
-        for (let date = from; date <= to; date = addDays(date, 1)) {
-          const own = rows.filter((r) => r.date === date && r.status !== 'rejected');
-          const work = own.filter((r) => r.type === 'WORK').sort((a, b) => a.startAt!.localeCompare(b.startAt!));
-          const { workedMinutes, breakMinutes } = summarizeDay(own);
-          const holiday = customHolidays.find((h) => h.date === date)?.name ?? holidayName(date, region) ?? null;
-          const targetMinutes = dailyTargetMinutes(date, { schedules, region, absences: absenceList, customHolidays });
-          const wd = weekdayIndex(date);
-          const prev = rows.filter((r) => r.type === 'WORK' && r.date === addDays(date, -1) && r.endAt).map((r) => r.endAt!).sort().pop();
-          const closed = work.filter((r) => r.endAt);
-          days.push({
-            date,
-            weekend: wd >= 5,
-            holiday,
-            absence: absences.get(date) ?? null,
-            targetMinutes,
-            start: work[0] ? work[0].startAt!.slice(11, 16) : null,
-            end: work.length && work[work.length - 1].endAt ? work[work.length - 1].endAt!.slice(11, 16) : null,
-            breakMinutes,
-            workedMinutes,
-            diffMinutes: workedMinutes - targetMinutes,
-            location: work.find((r) => r.location)?.location ?? null,
-            projectId: work.find((r) => r.projectId)?.projectId ?? null,
-            comment: work.find((r) => r.comment)?.comment ?? null,
-            status: work.some((r) => r.status === 'pending') ? 'pending' : work.length ? 'approved' : null,
-            running: work.some((r) => !r.endAt),
-            periodCount: work.length,
-            warnings: closed.length ? checkArbZG(closed.map((r) => ({ start: r.startAt!, end: r.endAt!, breakMinutes: r.breakMinutes })), prev) : [],
-          });
-        }
-        // Future days (and today, until something is recorded) are not "missing" hours yet.
-        const today = new Date().toISOString().slice(0, 10);
-        const totals = days.reduce(
-          (t, d) => ({ targetMinutes: t.targetMinutes + d.targetMinutes, workedMinutes: t.workedMinutes + d.workedMinutes, diffMinutes: t.diffMinutes + (d.date < today || d.workedMinutes > 0 ? d.diffMinutes : 0) }),
-          { targetMinutes: 0, workedMinutes: 0, diffMinutes: 0 },
-        );
-        return { month: query.month, days, totals };
+        return monthData(personId, query.month);
       },
     );
 
@@ -419,36 +453,60 @@ export const timeModule: OpenPersModule = {
       return { items: rows.map(view) };
     });
 
+    // ---------- Team overview ----------
+    route(
+      {
+        method: 'GET',
+        url: '/api/v1/attendance/team',
+        tag: 'time',
+        summary: 'Working times of everyone the caller may see: month totals, balance, clock status',
+        query: z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), orgUnitId: z.string().uuid().optional() }),
+      },
+      async ({ user, query }) => {
+        const visible = await authz.visiblePersonIds(user, 'time.read');
+        if (visible !== 'all' && !visible.size) return { month: query.month, items: [] };
+        const people = await db
+          .select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName, preferredName: persons.preferredName })
+          .from(persons)
+          .where(and(isNull(persons.anonymizedAt), visible === 'all' ? undefined : inArray(persons.id, [...visible])))
+          .orderBy(asc(persons.lastName), asc(persons.firstName));
+        const today = new Date().toISOString().slice(0, 10);
+        const items = [];
+        for (const p of people) {
+          const emp = await currentEmployment(db, p.id, today);
+          if (!emp || emp.status === 'INACTIVE') continue;
+          if (query.orgUnitId) {
+            const [link] = await db.select().from(employmentOrgUnits).where(and(eq(employmentOrgUnits.employmentId, emp.id), eq(employmentOrgUnits.orgUnitId, query.orgUnitId)));
+            if (!link) continue;
+          }
+          const [month, balance, open, pending] = await Promise.all([
+            monthData(p.id, query.month),
+            balanceOf(p.id),
+            db.select().from(attendancePeriods).where(and(eq(attendancePeriods.personId, p.id), isNull(attendancePeriods.endAt))),
+            db.select({ id: attendancePeriods.id }).from(attendancePeriods).where(and(eq(attendancePeriods.personId, p.id), eq(attendancePeriods.status, 'pending'))),
+          ]);
+          const todayRow = month.days.find((d) => d.date === today);
+          items.push({
+            person: { ...p, positionTitle: emp.positionTitle },
+            ...month.totals,
+            balanceMinutes: balance.balanceMinutes,
+            clockedInSince: open[0] ? norm(open[0].startAt) : null,
+            absentToday: todayRow?.absence?.typeName ?? null,
+            warningDays: month.days.filter((d) => d.warnings.length > 0).length,
+            pendingCount: pending.length,
+            lastEntryDate: [...month.days].reverse().find((d) => d.periodCount > 0)?.date ?? null,
+          });
+        }
+        return { month: query.month, items };
+      },
+    );
+
     // ---------- Balance ----------
     route(
       { method: 'GET', url: '/api/v1/persons/:id/time-balance', tag: 'time', summary: 'Target vs. worked time (overtime balance)', query: z.object({ from: isoDateSchema.optional(), to: isoDateSchema.optional() }) },
       async ({ user, params, query }) => {
         await authz.assert(user, 'time.read', params.id);
-        // By default the balance runs until yesterday: the current day is not finished yet.
-        const to = query.to ?? addDays(new Date().toISOString().slice(0, 10), -1);
-        const emp = await currentEmployment(db, params.id, to);
-        const from = query.from ?? emp?.startDate ?? to;
-        if (query.from && query.to && from > to) throw unprocessable('Invalid range', [{ path: 'from', message: 'from must not be after to' }]);
-        if (from > to) return { from, to, targetMinutes: 0, workedMinutes: 0, balanceMinutes: 0 };
-        const region = (await regionOf(db, params.id, to)) as Region;
-        const schedules = await schedulesOf(db, params.id);
-        const absenceRows = await db
-          .select({ p: absencePeriods, t: absenceTypes })
-          .from(absencePeriods)
-          .innerJoin(absenceTypes, eq(absenceTypes.id, absencePeriods.typeId))
-          .where(and(eq(absencePeriods.personId, params.id), eq(absencePeriods.status, 'approved'), lte(absencePeriods.startDate, to)));
-        const absences: { date: string; fraction: number }[] = [];
-        for (const { p, t } of absenceRows) {
-          for (const d of await breakdownFor(db, p, t)) {
-            if (d.date < from || d.date > to || d.scheduledHours === 0) continue;
-            const fraction = t.unit === 'DAY' ? (p.startHalf && d.date === p.startDate) || (p.endHalf && d.date === p.endDate) ? 0.5 : 1 : Math.min(1, d.amount / d.scheduledHours);
-            absences.push({ date: d.date, fraction });
-          }
-        }
-        const rows = await db.select().from(attendancePeriods).where(and(eq(attendancePeriods.personId, params.id), eq(attendancePeriods.type, 'WORK'), gte(attendancePeriods.date, from), lte(attendancePeriods.date, to), ne(attendancePeriods.status, 'rejected')));
-        const worked = rows.filter((r) => r.endAt).map((r) => ({ date: r.date, minutes: minutesBetween(norm(r.startAt)!, norm(r.endAt)!) - r.breakMinutes }));
-        const customHolidays = await customHolidaysFor(db, region, from, to);
-        return { from, to, ...computeTimeBalance({ from, to, schedules, region, absences, worked, customHolidays }) };
+        return balanceOf(params.id, query.from, query.to);
       },
     );
   },

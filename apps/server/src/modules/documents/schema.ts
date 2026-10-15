@@ -9,6 +9,8 @@ export const documentCategories = pgTable('document_categories', {
   name: text('name').notNull(),
   /** Default visibility for employees of new documents in this category. */
   employeeVisible: boolean('employee_visible').notNull().default(false),
+  /** Data category that governs who may see documents of this category. */
+  dataCategory: text('data_category').notNull().default('employment'),
   position: integer('position').notNull().default(0),
   createdAt: createdAt(),
 });

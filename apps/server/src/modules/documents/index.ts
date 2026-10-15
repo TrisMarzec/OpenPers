@@ -7,6 +7,7 @@ import type { Principal } from '../../lib/authz';
 import { audit, emit, type AppContext, type OpenPersModule } from '../../lib/context';
 import { forbidden, HttpError, notFound, unprocessable } from '../../lib/errors';
 import { currentEmployment, isoDateSchema } from '../people/service';
+import { atLeast, DATA_CATEGORIES, type DataCategory } from '@openpers/shared';
 
 type Doc = typeof documents.$inferSelect;
 
@@ -30,11 +31,12 @@ export function checkFileType(mime: string, filename: string, data: Buffer): voi
 }
 
 const DEFAULT_CATEGORIES = [
-  { name: 'Arbeitsvertrag', employeeVisible: false, position: 0 },
-  { name: 'Gehaltsabrechnungen', employeeVisible: true, position: 1 },
-  { name: 'Bescheinigungen', employeeVisible: true, position: 2 },
-  { name: 'Zeugnisse', employeeVisible: true, position: 3 },
-  { name: 'Sonstiges', employeeVisible: false, position: 4 },
+  // Contracts usually state the salary, so they fall under compensation.
+  { name: 'Arbeitsvertrag', employeeVisible: false, dataCategory: 'compensation', position: 0 },
+  { name: 'Gehaltsabrechnungen', employeeVisible: true, dataCategory: 'payroll', position: 1 },
+  { name: 'Bescheinigungen', employeeVisible: true, dataCategory: 'personal', position: 2 },
+  { name: 'Zeugnisse', employeeVisible: true, dataCategory: 'employment', position: 3 },
+  { name: 'Sonstiges', employeeVisible: false, dataCategory: 'employment', position: 4 },
 ];
 
 function renderTemplate(body: string, data: Record<string, Record<string, unknown>>): string {
@@ -59,17 +61,32 @@ export const documentsModule: OpenPersModule = {
       x.select({ id: documents.id, name: documents.name, mime: documents.mime, size: documents.size, documentDate: documents.documentDate, createdAt: documents.createdAt }).from(documents).where(eq(documents.ownerPersonId, personId));
 
     /** Full access (incl. HR-only documents) requires documents.write over the owner. */
-    async function access(user: Principal, ownerPersonId: string): Promise<'full' | 'visible' | 'none'> {
-      if (await authz.can(user, 'documents.write', ownerPersonId)) return 'full';
-      if (await authz.can(user, 'documents.read', ownerPersonId)) return 'visible';
-      return 'none';
+    /** Data category of a document, via its document category (uncategorized → employment). */
+    async function dataCategoryOf(categoryId: string | null): Promise<DataCategory> {
+      if (!categoryId) return 'employment';
+      const [c] = await db.select({ dataCategory: documentCategories.dataCategory }).from(documentCategories).where(eq(documentCategories.id, categoryId));
+      return (c?.dataCategory as DataCategory) ?? 'employment';
+    }
+
+    /** Managing (upload for others, hidden docs, delete) needs documents.write and `edit` on the data category. */
+    async function canManage(user: Principal, ownerPersonId: string, cat: DataCategory) {
+      return (await authz.can(user, 'documents.write', ownerPersonId)) && atLeast((await authz.categoryAccess(user, ownerPersonId))[cat], 'edit');
+    }
+
+    /** Viewing needs document read access and `view` on the data category; owners only see documents shared with them. */
+    async function canSee(user: Principal, d: Doc) {
+      const owner = d.ownerPersonId!;
+      const cat = await dataCategoryOf(d.categoryId);
+      if (await canManage(user, owner, cat)) return true;
+      if (!(await authz.can(user, 'documents.read', owner)) && !(await authz.can(user, 'documents.write', owner))) return false;
+      if (!atLeast((await authz.categoryAccess(user, owner))[cat], 'view')) return false;
+      return owner === user.personId ? d.employeeVisible : true;
     }
 
     async function loadDoc(user: Principal, id: string): Promise<Doc> {
       const [d] = await db.select().from(documents).where(eq(documents.id, id));
       if (!d || !d.ownerPersonId) throw notFound('Document not found');
-      const level = await access(user, d.ownerPersonId);
-      if (level === 'none' || (level === 'visible' && !d.employeeVisible)) throw forbidden();
+      if (!(await canSee(user, d))) throw forbidden();
       return d;
     }
 
@@ -94,7 +111,7 @@ export const documentsModule: OpenPersModule = {
     }
 
     // ---------- Categories ----------
-    const catBody = z.object({ name: z.string().min(1).max(100), employeeVisible: z.boolean().default(false), position: z.number().int().default(0) });
+    const catBody = z.object({ name: z.string().min(1).max(100), employeeVisible: z.boolean().default(false), dataCategory: z.enum(DATA_CATEGORIES).default('employment'), position: z.number().int().default(0) });
     route({ method: 'GET', url: '/api/v1/document-categories', tag: 'documents', summary: 'List document categories' }, async () => ({ items: await db.select().from(documentCategories).orderBy(asc(documentCategories.position), asc(documentCategories.name)) }));
     route({ method: 'POST', url: '/api/v1/document-categories', perm: 'documents.manage', tag: 'documents', summary: 'Create category', body: catBody }, async ({ user, body }, reply) => {
       const [c] = await db.insert(documentCategories).values(body).returning();
@@ -116,16 +133,17 @@ export const documentsModule: OpenPersModule = {
 
     // ---------- Documents ----------
     route({ method: 'GET', url: '/api/v1/persons/:id/documents', tag: 'documents', summary: 'Documents of a person' }, async ({ user, params }) => {
-      const level = await access(user, params.id);
-      if (level === 'none') throw forbidden();
-      const conds = [eq(documents.ownerPersonId, params.id), level === 'visible' ? eq(documents.employeeVisible, true) : undefined].filter(Boolean) as any[];
-      return { items: await db.select().from(documents).where(and(...conds)).orderBy(desc(documents.createdAt)) };
+      if (!(await authz.can(user, 'documents.read', params.id)) && !(await authz.can(user, 'documents.write', params.id))) throw forbidden();
+      const all = await db.select().from(documents).where(eq(documents.ownerPersonId, params.id)).orderBy(desc(documents.createdAt));
+      const items = [];
+      for (const d of all) if (await canSee(user, d)) items.push({ ...d, manageable: await canManage(user, params.id, await dataCategoryOf(d.categoryId)) });
+      return { items };
     });
 
     route({ method: 'POST', url: '/api/v1/persons/:id/documents', tag: 'documents', summary: 'Upload a document (multipart: file, categoryId?, name?, documentDate?, employeeVisible?)' }, async ({ user, params, raw }, reply) => {
-      const full = await authz.can(user, 'documents.write', params.id);
       const self = params.id === user.personId && authz.has(user, 'documents.read');
-      if (!full && !self) throw forbidden();
+      // Whether the uploader may manage documents of the chosen category is checked once the fields are read.
+      if (!self && !(await authz.can(user, 'documents.write', params.id))) throw forbidden();
       const [owner] = await db.select({ id: persons.id }).from(persons).where(eq(persons.id, params.id));
       if (!owner) throw notFound('Person not found');
       if (!raw.isMultipart()) throw unprocessable('Expected multipart/form-data', [{ path: 'file', message: 'Required' }]);
@@ -140,6 +158,8 @@ export const documentsModule: OpenPersModule = {
       const meta = z
         .object({ categoryId: z.string().uuid().optional(), name: z.string().min(1).max(200).optional(), documentDate: isoDateSchema.optional(), employeeVisible: z.enum(['true', 'false']).optional() })
         .parse(fields);
+      const full = await canManage(user, params.id, await dataCategoryOf(meta.categoryId ?? null));
+      if (!full && !self) throw forbidden('No edit access to this document category');
       const row = await store(user, params.id, {
         name: meta.name ?? file.filename,
         mime: file.mimetype,
@@ -169,7 +189,7 @@ export const documentsModule: OpenPersModule = {
       { method: 'PATCH', url: '/api/v1/documents/:id', tag: 'documents', summary: 'Update document metadata', body: z.object({ name: z.string().min(1).max(200).optional(), categoryId: z.string().uuid().nullable().optional(), documentDate: isoDateSchema.nullable().optional(), employeeVisible: z.boolean().optional() }) },
       async ({ user, params, body }) => {
         const d = await loadDoc(user, params.id);
-        if ((await access(user, d.ownerPersonId!)) !== 'full') throw forbidden();
+        if (!(await canManage(user, d.ownerPersonId!, await dataCategoryOf(d.categoryId)))) throw forbidden();
         const [row] = await db.update(documents).set(body).where(eq(documents.id, d.id)).returning();
         await audit(db, user.userId, 'document', d.id, 'update', body);
         return row;
@@ -178,7 +198,7 @@ export const documentsModule: OpenPersModule = {
 
     route({ method: 'DELETE', url: '/api/v1/documents/:id', tag: 'documents', summary: 'Delete a document' }, async ({ user, params }) => {
       const d = await loadDoc(user, params.id);
-      if ((await access(user, d.ownerPersonId!)) !== 'full') throw forbidden();
+      if (!(await canManage(user, d.ownerPersonId!, await dataCategoryOf(d.categoryId)))) throw forbidden();
       await db.transaction(async (tx) => {
         await tx.delete(documents).where(eq(documents.id, d.id));
         await audit(tx, user.userId, 'document', d.id, 'delete', { name: d.name });
@@ -215,6 +235,7 @@ export const documentsModule: OpenPersModule = {
         await authz.assert(user, 'documents.write', params.personId);
         const [t] = await db.select().from(documentTemplates).where(eq(documentTemplates.id, params.id));
         if (!t) throw notFound('Template not found');
+        if (!(await canManage(user, params.personId, await dataCategoryOf(t.categoryId)))) throw forbidden('No edit access to this document category');
         const [person] = await db.select().from(persons).where(eq(persons.id, params.personId));
         if (!person) throw notFound('Person not found');
         const today = new Date().toISOString().slice(0, 10);

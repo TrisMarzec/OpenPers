@@ -43,6 +43,13 @@
       "when": 1792012721578,
       "tag": "0005_attendance_breaks",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792082323493,
+      "tag": "0006_field_access",
+      "breakpoints": true
     }
   ]
 }

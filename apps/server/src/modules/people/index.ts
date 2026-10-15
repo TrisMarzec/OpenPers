@@ -1,5 +1,9 @@
 import { and, asc, eq, ilike, inArray, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
+import { atLeast, DATA_CATEGORIES, PERSON_FIELD_CATEGORY, type DataCategory } from '@openpers/shared';
+
+/** Categories whose reads by third parties are written to the audit log. */
+const SENSITIVE_CATEGORIES: DataCategory[] = ['compensation', 'payroll'];
 import type { Exec } from '../../db';
 import {
   attributeDefinitions,
@@ -15,6 +19,7 @@ import {
   workplaces,
   workSchedules,
 } from '../../db/schema';
+import { registerCompensationRoutes } from './compensation';
 import { decodeCursor, makeRoute, page, paginationQuery } from '../../lib/api';
 import type { Principal } from '../../lib/authz';
 import { audit, diff, emit, type AppContext, type OpenPersModule } from '../../lib/context';
@@ -23,7 +28,6 @@ import { createPersonInput, createPersonWithEmployment, employmentInput, isoDate
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-const SELF_SERVICE_FIELDS = ['phone', 'privateAddress', 'emergencyContact', 'preferredName', 'language'] as const;
 
 const employmentPatch = employmentInput
   .omit({ startDate: true, weeklyHours: true, fullTimeWeeklyHours: true })
@@ -74,6 +78,7 @@ export const peopleModule: OpenPersModule = {
   register(app, ctx: AppContext) {
     const { db, authz, cipher } = ctx;
     const route = makeRoute(app, ctx.registry);
+    registerCompensationRoutes(app, ctx);
 
     async function loadPerson(id: string) {
       const [p] = await db.select().from(persons).where(eq(persons.id, id));
@@ -101,38 +106,57 @@ export const peopleModule: OpenPersModule = {
       }));
     }
 
-    async function attributesOf(user: Principal, personId: string, forceSensitive = false) {
+    /** Custom attributes the user may see, decided per attribute by its data category. */
+    async function attributesOf(user: Principal, personId: string, forceAll = false) {
       const defs = await db.select().from(attributeDefinitions).orderBy(asc(attributeDefinitions.position));
       const values = await db.select().from(attributeValues).where(eq(attributeValues.personId, personId));
-      const canSensitive = forceSensitive || (await authz.can(user, 'people.sensitive', personId));
+      const access = forceAll ? null : await authz.categoryAccess(user, personId);
       const out: Record<string, unknown> = {};
       let readSensitive = false;
       for (const d of defs) {
         const v = values.find((x) => x.definitionId === d.id);
         if (!v) continue;
-        if (d.sensitive) {
-          if (!canSensitive) continue;
-          out[d.key] = cipher.decrypt((v.value as { enc: string }).enc);
-          readSensitive = true;
-        } else out[d.key] = v.value;
+        if (access && !atLeast(access[d.category as DataCategory] ?? 'none', 'view')) continue;
+        out[d.key] = d.sensitive ? cipher.decrypt((v.value as { enc: string }).enc) : v.value;
+        if (SENSITIVE_CATEGORIES.includes(d.category as DataCategory)) readSensitive = true;
       }
-      if (readSensitive && user.personId !== personId) await audit(db, user.userId, 'person', personId, 'read_sensitive');
+      if (readSensitive && user.personId !== personId) await audit(db, user.userId, 'person', personId, 'read_sensitive', { categories: ['payroll'] });
       return out;
     }
 
+    /** Fields every viewer of an employment may see (they also appear in the company directory). */
+    const PUBLIC_EMPLOYMENT_FIELDS = ['id', 'personId', 'positionTitle', 'status', 'orgUnits', 'orgUnitIds', 'workplaceId'] as const;
+
     async function detail(user: Principal, id: string) {
       const p = await loadPerson(id);
+      const access = await authz.categoryAccess(user, id);
       const emps = await employmentsOf([id]);
       const supIds = [...new Set(emps.map((e) => e.supervisorPersonId).filter(Boolean))] as string[];
       const sups = supIds.length ? await db.select({ id: persons.id, firstName: persons.firstName, lastName: persons.lastName }).from(persons).where(inArray(persons.id, supIds)) : [];
       const [account] = await db.select({ id: users.id, email: users.email, active: users.active }).from(users).where(eq(users.personId, id));
+      const person: Record<string, unknown> = { ...p };
+      for (const [field, cat] of Object.entries(PERSON_FIELD_CATEGORY)) if (!atLeast(access[cat], 'view')) delete person[field];
+      const fullEmployment = atLeast(access.employment, 'view');
+      const employments = emps.map((e) => {
+        const withSup = { ...e, supervisor: sups.find((s) => s.id === e.supervisorPersonId) ?? null };
+        return fullEmployment ? withSup : Object.fromEntries(PUBLIC_EMPLOYMENT_FIELDS.map((k) => [k, (withSup as Record<string, unknown>)[k]]));
+      });
+      const current = pickCurrent(emps);
       return {
-        ...p,
-        employments: emps.map((e) => ({ ...e, supervisor: sups.find((s) => s.id === e.supervisorPersonId) ?? null })),
-        currentEmployment: pickCurrent(emps) ?? null,
+        ...person,
+        access,
+        employments,
+        currentEmployment: current ? employments.find((e) => e.id === current.id) ?? null : null,
         attributes: await attributesOf(user, id),
-        user: account ?? null,
+        user: account && (user.personId === id || authz.has(user, 'users.manage')) ? account : null,
       };
+    }
+
+    /** Throws 403 unless the user has `edit` on every given category for this person. */
+    async function assertEdit(user: Principal, personId: string, categories: DataCategory[]) {
+      const access = await authz.categoryAccess(user, personId);
+      const denied = categories.filter((c) => !atLeast(access[c], 'edit'));
+      if (denied.length) throw forbidden(`No edit access to: ${denied.join(', ')}`);
     }
 
     // ---------- Directory ----------
@@ -213,12 +237,9 @@ export const peopleModule: OpenPersModule = {
     });
 
     route({ method: 'PATCH', url: '/api/v1/persons/:id', tag: 'people', summary: 'Update personal data', body: personInput.partial() }, async ({ user, params, body }) => {
-      const canWrite = await authz.can(user, 'people.write', params.id);
-      if (!canWrite) {
-        const self = user.personId === params.id;
-        const onlySelfFields = Object.keys(body).every((k) => (SELF_SERVICE_FIELDS as readonly string[]).includes(k));
-        if (!self || !onlySelfFields) throw forbidden('Not allowed to change these fields');
-      }
+      // Every changed field needs `edit` on its data category (own profile or others in scope).
+      const categories = [...new Set(Object.keys(body).map((k) => PERSON_FIELD_CATEGORY[k]).filter(Boolean))] as DataCategory[];
+      await assertEdit(user, params.id, categories);
       const before = await loadPerson(params.id);
       await db.transaction(async (tx) => {
         await tx.update(persons).set({ ...body, updatedAt: new Date() }).where(eq(persons.id, params.id));
@@ -261,6 +282,7 @@ export const peopleModule: OpenPersModule = {
     // ---------- Employments ----------
     route({ method: 'POST', url: '/api/v1/persons/:id/employments', perm: 'people.write', tag: 'people', summary: 'Add an employment', body: employmentInput }, async ({ user, params, body }, reply) => {
       await authz.assert(user, 'people.write', params.id);
+      await assertEdit(user, params.id, ['employment']);
       await loadPerson(params.id);
       if (body.supervisorPersonId === params.id) throw unprocessable('Invalid supervisor', [{ path: 'supervisorPersonId', message: 'A person cannot supervise themselves' }]);
       const [e] = await db.transaction(async (tx) => {
@@ -282,6 +304,7 @@ export const peopleModule: OpenPersModule = {
       { method: 'PATCH', url: '/api/v1/persons/:id/employments/:eid', perm: 'people.write', tag: 'people', summary: 'Change an employment, optionally effective at a future date', body: employmentPatch },
       async ({ user, params, body }) => {
         await authz.assert(user, 'people.write', params.id);
+      await assertEdit(user, params.id, ['employment']);
         const [before] = await db.select().from(employments).where(and(eq(employments.id, params.eid), eq(employments.personId, params.id)));
         if (!before) throw notFound('Employment not found');
         const { effectiveDate, ...changes } = body;
@@ -308,6 +331,7 @@ export const peopleModule: OpenPersModule = {
 
     route({ method: 'DELETE', url: '/api/v1/persons/:id/employments/:eid/changes/:cid', perm: 'people.write', tag: 'people', summary: 'Cancel a scheduled change' }, async ({ user, params }) => {
       await authz.assert(user, 'people.write', params.id);
+      await assertEdit(user, params.id, ['employment']);
       const res = await db.delete(employmentChanges).where(and(eq(employmentChanges.id, params.cid), eq(employmentChanges.employmentId, params.eid), isNull(employmentChanges.appliedAt))).returning();
       if (!res.length) throw notFound();
       await audit(db, user.userId, 'employment', params.eid, 'cancel_scheduled_change', { changeId: params.cid });
@@ -324,6 +348,7 @@ export const peopleModule: OpenPersModule = {
       },
       async ({ user, params, body }, reply) => {
         await authz.assert(user, 'people.write', params.id);
+      await assertEdit(user, params.id, ['employment']);
         const [e] = await db.select().from(employments).where(and(eq(employments.id, params.eid), eq(employments.personId, params.id)));
         if (!e) throw notFound('Employment not found');
         const [row] = await db
@@ -345,6 +370,7 @@ export const peopleModule: OpenPersModule = {
       options: z.array(z.string()).nullish(),
       section: z.string().max(50).default('general'),
       sensitive: z.boolean().default(false),
+      category: z.enum(DATA_CATEGORIES).optional(),
       position: z.number().int().default(0),
     });
     route({ method: 'GET', url: '/api/v1/attribute-definitions', tag: 'people', summary: 'List custom attribute definitions' }, async () => ({
@@ -352,7 +378,7 @@ export const peopleModule: OpenPersModule = {
     }));
     route({ method: 'POST', url: '/api/v1/attribute-definitions', perm: 'people.write', tag: 'people', summary: 'Create a custom attribute', body: defBody }, async ({ user, body }, reply) => {
       if (body.type === 'select' && !body.options?.length) throw unprocessable('Select attributes need options', [{ path: 'options', message: 'Required for select' }]);
-      const [d] = await db.insert(attributeDefinitions).values({ ...body, options: body.options ?? null, sensitive: body.sensitive ? 1 : 0 }).returning();
+      const [d] = await db.insert(attributeDefinitions).values({ ...body, options: body.options ?? null, sensitive: body.sensitive ? 1 : 0, category: body.category ?? (body.sensitive ? 'payroll' : 'employment') }).returning();
       await audit(db, user.userId, 'attribute_definition', d.id, 'create', body);
       reply.code(201);
       return { ...d, sensitive: !!d.sensitive };
@@ -370,7 +396,6 @@ export const peopleModule: OpenPersModule = {
     });
 
     route({ method: 'PUT', url: '/api/v1/persons/:id/attributes', tag: 'people', summary: 'Set custom attribute values (null removes)', body: z.record(z.unknown()) }, async ({ user, params, body }) => {
-      await authz.assert(user, 'people.write', params.id);
       await loadPerson(params.id);
       const defs = await db.select().from(attributeDefinitions);
       const errors: { path: string; message: string }[] = [];
@@ -378,9 +403,10 @@ export const peopleModule: OpenPersModule = {
         const d = defs.find((x) => x.key === key);
         if (!d) errors.push({ path: key, message: 'Unknown attribute' });
         else if (value !== null && !validAttribute(d.type, d.options, value)) errors.push({ path: key, message: `Invalid value for ${d.type}` });
-        else if (d.sensitive && !(await authz.can(user, 'people.sensitive', params.id))) errors.push({ path: key, message: 'Requires people.sensitive' });
       }
       if (errors.length) throw unprocessable('Invalid attributes', errors);
+      // Each attribute needs `edit` on its data category.
+      await assertEdit(user, params.id, [...new Set(Object.keys(body).map((k) => defs.find((x) => x.key === k)!.category as DataCategory))]);
       await db.transaction(async (tx) => {
         for (const [key, value] of Object.entries(body)) {
           const d = defs.find((x) => x.key === key)!;

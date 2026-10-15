@@ -25,6 +25,7 @@ export const WEBHOOK_EVENTS = [
   'application.created',
   'application.stage_changed',
   'candidate.hired',
+  'compensation.created',
 ] as const;
 
 const FORBIDDEN_HEADERS = ['host', 'content-length', 'transfer-encoding', 'connection', 'upgrade', 'te', 'trailer', 'expect', 'content-type', 'x-openpers-'];

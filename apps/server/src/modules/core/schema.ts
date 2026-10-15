@@ -37,6 +37,8 @@ export const roles = pgTable(
     name: text('name').notNull(),
     permissions: jsonb('permissions').$type<string[]>().notNull(),
     defaultScope: text('default_scope').notNull().default('self'),
+    /** Access level per data category for own profile and others; null = built-in default. */
+    fieldAccess: jsonb('field_access').$type<Record<string, { self: string; others: string }> | null>(),
     builtin: boolean('builtin').notNull().default(false),
     createdAt: createdAt(),
   },

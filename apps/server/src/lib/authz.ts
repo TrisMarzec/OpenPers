@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import type { Permission, Scope } from '@openpers/shared';
+import { DATA_CATEGORIES, maxLevel, type CategoryAccess, type FieldAccess, type Permission, type Scope } from '@openpers/shared';
 import type { DB } from '../db';
 import { forbidden } from './errors';
 
@@ -10,9 +10,11 @@ export interface Principal {
   locale: string;
   /** Permission → scopes granted by the user's role assignments. */
   permissions: Record<string, Scope[]>;
+  /** One entry per role assignment: its scope and its access matrix for sensitive data. */
+  grants: { scope: Scope; fieldAccess: FieldAccess }[];
   tokenId?: string;
   /** Per-request memo for scope lookups. */
-  cache: Map<string, Set<string>>;
+  cache: Map<string, Set<string> | CategoryAccess>;
 }
 
 export type Visible = 'all' | Set<string>;
@@ -49,10 +51,31 @@ export class Authz {
     if (!(await this.can(p, perm, targetPersonId))) throw forbidden(`Missing permission ${perm}`);
   }
 
+  /** Effective access level per data category of `p` on the given person (highest over all roles). */
+  async categoryAccess(p: Principal, personId: string): Promise<CategoryAccess> {
+    const key = `access:${personId}`;
+    const cached = p.cache.get(key) as CategoryAccess | undefined;
+    if (cached) return cached;
+    const out = Object.fromEntries(DATA_CATEGORIES.map((c) => [c, 'none'])) as CategoryAccess;
+    const self = personId === p.personId;
+    for (const g of p.grants) {
+      let covered = self;
+      if (!self) {
+        if (g.scope === 'all') covered = true;
+        else if (g.scope === 'reports') covered = (await this.reportsOf(p)).has(personId);
+        else if (g.scope === 'org_unit') covered = (await this.orgUnitMembers(p)).has(personId);
+      }
+      if (!covered) continue;
+      for (const c of DATA_CATEGORIES) out[c] = maxLevel(out[c], self ? g.fieldAccess[c].self : g.fieldAccess[c].others);
+    }
+    p.cache.set(key, out);
+    return out;
+  }
+
   /** Direct and indirect reports via active employments' supervisor links. */
   async reportsOf(p: Principal): Promise<Set<string>> {
     const key = 'reports';
-    const cached = p.cache.get(key);
+    const cached = p.cache.get(key) as Set<string> | undefined;
     if (cached) return cached;
     const res = await this.db.execute(sql`
       WITH RECURSIVE r(person_id) AS (
@@ -72,7 +95,7 @@ export class Authz {
   /** Persons in any org unit (incl. sub-units) the principal's employment belongs to. */
   async orgUnitMembers(p: Principal): Promise<Set<string>> {
     const key = 'org_unit';
-    const cached = p.cache.get(key);
+    const cached = p.cache.get(key) as Set<string> | undefined;
     if (cached) return cached;
     const res = await this.db.execute(sql`
       WITH RECURSIVE units(id) AS (

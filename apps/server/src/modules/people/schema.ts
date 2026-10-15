@@ -98,6 +98,8 @@ export const attributeDefinitions = pgTable(
     type: text('type').notNull(),
     options: jsonb('options').$type<string[]>(),
     section: text('section').notNull().default('general'),
+    /** Data category that governs who may see/edit this attribute. */
+    category: text('category').notNull().default('employment'),
     sensitive: integer('sensitive').notNull().default(0),
     position: integer('position').notNull().default(0),
     createdAt: createdAt(),
@@ -115,4 +117,24 @@ export const attributeValues = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.personId, t.definitionId] })],
+);
+
+/** Salary and other payments. The amount is stored encrypted. */
+export const compensations = pgTable(
+  'compensations',
+  {
+    id: id(),
+    personId: uuid('person_id').notNull().references(() => persons.id, { onDelete: 'cascade' }),
+    /** FIXED_SALARY | HOURLY_SALARY | ONE_TIME | RECURRING */
+    type: text('type').notNull(),
+    amountEnc: text('amount_enc').notNull(),
+    currency: text('currency').notNull().default('EUR'),
+    /** MONTHLY | YEARLY | null for one-time payments */
+    interval: text('interval'),
+    validFrom: date('valid_from', { mode: 'string' }).notNull(),
+    comment: text('comment'),
+    createdByUserId: uuid('created_by_user_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('compensations_person_idx').on(t.personId)],
 );

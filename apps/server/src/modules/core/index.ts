@@ -1,6 +1,6 @@
 import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { BUILTIN_ROLES, PERMISSIONS, REGIONS, SCOPES, type Scope } from '@openpers/shared';
+import { ACCESS_LEVELS, BUILTIN_ROLES, DATA_CATEGORIES, PERMISSIONS, REGIONS, SCOPES, type DataCategory, type Scope } from '@openpers/shared';
 import { apiTokens, auditLog, company, roleAssignments, roles, sessions, users, persons } from '../../db/schema';
 import type { Exec } from '../../db';
 import { decodeCursor, makeRoute, page, paginationQuery } from '../../lib/api';
@@ -8,7 +8,7 @@ import { audit, diff, type AppContext, type OpenPersModule } from '../../lib/con
 import { hashPassword, randomToken, sha256, verifyPassword } from '../../lib/crypto';
 import { conflict, forbidden, HttpError, notFound, unauthorized, unprocessable } from '../../lib/errors';
 import { createPersonWithEmployment } from '../people/service';
-import { loadPrincipal, SESSION_COOKIE, SESSION_DAYS } from './principal';
+import { loadPrincipal, resolveFieldAccess, SESSION_COOKIE, SESSION_DAYS } from './principal';
 import { registerWebhookRoutes } from './webhooks';
 import type { Principal } from '../../lib/authz';
 
@@ -85,7 +85,7 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
             if (n > 0) throw conflict('Setup has already been completed');
             await tx.insert(company).values({ name: body.companyName, region: body.region, locale: body.locale });
             for (const r of BUILTIN_ROLES) {
-              await tx.insert(roles).values({ key: r.key, name: r.name, permissions: r.permissions, defaultScope: r.defaultScope, builtin: true });
+              await tx.insert(roles).values({ key: r.key, name: r.name, permissions: r.permissions, defaultScope: r.defaultScope, fieldAccess: r.fieldAccess, builtin: true });
             }
             const today = new Date().toISOString().slice(0, 10);
             const { personId } = await createPersonWithEmployment(
@@ -225,29 +225,46 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
       );
 
       // ---------- Roles ----------
+      const level = z.enum(ACCESS_LEVELS);
+      const fieldAccessBody = z.record(z.enum(DATA_CATEGORIES), z.object({ self: level, others: level }).partial());
       const roleBody = z.object({
         key: z.string().regex(/^[a-z0-9_-]{2,40}$/),
         name: z.string().min(1).max(100),
         permissions: z.array(z.enum(PERMISSIONS)).min(1),
         defaultScope: z.enum(SCOPES as [Scope, ...Scope[]]).default('self'),
+        fieldAccess: fieldAccessBody.optional(),
       });
-      route({ method: 'GET', url: '/api/v1/roles', perm: 'users.manage', tag: 'users', summary: 'List roles' }, async () => ({ items: await db.select().from(roles).orderBy(roles.name) }));
+      const roleView = (r: typeof roles.$inferSelect) => ({ ...r, fieldAccess: resolveFieldAccess(r.key, r.fieldAccess) });
+      const mergeAccess = (key: string, current: unknown, patch?: z.infer<typeof fieldAccessBody>) => {
+        const base = resolveFieldAccess(key, current);
+        if (!patch) return base;
+        return Object.fromEntries(Object.entries(base).map(([c, v]) => [c, { ...v, ...(patch[c as DataCategory] ?? {}) }]));
+      };
+      route({ method: 'GET', url: '/api/v1/roles', perm: 'users.manage', tag: 'users', summary: 'List roles incl. access matrix for sensitive data' }, async () => ({ items: (await db.select().from(roles).orderBy(roles.name)).map(roleView) }));
       route({ method: 'POST', url: '/api/v1/roles', perm: 'users.manage', tag: 'users', summary: 'Create a custom role', body: roleBody }, async ({ user, body }, reply) => {
         const [dup] = await db.select().from(roles).where(eq(roles.key, body.key));
         if (dup) throw conflict('Role key already exists');
-        const [r] = await db.insert(roles).values(body).returning();
+        const [r] = await db.insert(roles).values({ ...body, fieldAccess: mergeAccess(body.key, null, body.fieldAccess) }).returning();
         await audit(db, user.userId, 'role', r.id, 'create', body);
         reply.code(201);
-        return r;
+        return roleView(r);
       });
-      route({ method: 'PATCH', url: '/api/v1/roles/:id', perm: 'users.manage', tag: 'users', summary: 'Update a custom role', body: roleBody.omit({ key: true }).partial() }, async ({ user, body, params }) => {
-        const [r] = await db.select().from(roles).where(eq(roles.id, params.id));
-        if (!r) throw notFound();
-        if (r.builtin) throw forbidden('Built-in roles cannot be changed');
-        const [u] = await db.update(roles).set(body).where(eq(roles.id, params.id)).returning();
-        await audit(db, user.userId, 'role', r.id, 'update', diff(r, body));
-        return u;
-      });
+      route(
+        { method: 'PATCH', url: '/api/v1/roles/:id', perm: 'users.manage', tag: 'users', summary: 'Update a role (built-in roles: only the access matrix, not for admin)', body: roleBody.omit({ key: true }).partial() },
+        async ({ user, body, params }) => {
+          const [r] = await db.select().from(roles).where(eq(roles.id, params.id));
+          if (!r) throw notFound();
+          if (r.builtin) {
+            const onlyAccess = Object.keys(body).every((k) => k === 'fieldAccess');
+            if (!onlyAccess || r.key === 'admin') throw forbidden('Built-in roles: only the access matrix can be changed (not for admin)');
+          }
+          const { fieldAccess, ...rest } = body;
+          const patch = { ...rest, ...(fieldAccess ? { fieldAccess: mergeAccess(r.key, r.fieldAccess, fieldAccess) } : {}) };
+          const [u] = await db.update(roles).set(patch).where(eq(roles.id, params.id)).returning();
+          await audit(db, user.userId, 'role', r.id, 'update', diff(r, patch));
+          return roleView(u);
+        },
+      );
       route({ method: 'DELETE', url: '/api/v1/roles/:id', perm: 'users.manage', tag: 'users', summary: 'Delete a custom role' }, async ({ user, params }) => {
         const [r] = await db.select().from(roles).where(eq(roles.id, params.id));
         if (!r) throw notFound();
