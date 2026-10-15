@@ -1,0 +1,25 @@
+name: Feature request
+description: Suggest an idea or a missing HR feature
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Which problem would this solve?
+      description: Describe the HR process or situation, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: dropdown
+    id: region
+    attributes:
+      label: Relevant for
+      multiple: true
+      options:
+        - Germany
+        - Austria
+        - Switzerland
+        - All regions

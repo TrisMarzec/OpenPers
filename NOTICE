@@ -1,0 +1,15 @@
+OpenPers – self-hostable HR software
+Copyright (C) 2026 The OpenPers contributors
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+GNU Affero General Public License as published by the Free Software Foundation, version 3 of the
+License only (SPDX-License-Identifier: AGPL-3.0-only). See the LICENSE file for the full text.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+If you run a modified version of OpenPers for users over a network, the AGPL requires you to offer
+those users the corresponding source code of your version (section 13).
+
+OpenPers is an independent project and is not affiliated with, endorsed by or derived from Personio
+or any other vendor. Product names are trademarks of their respective owners.

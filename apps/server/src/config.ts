@@ -1,5 +1,9 @@
 import { resolve } from 'node:path';
 
+/** Injected from the root package.json at build time (tsup `define`); "dev" when run from source. */
+declare const __OPENPERS_VERSION__: string | undefined;
+const VERSION = typeof __OPENPERS_VERSION__ === 'string' ? __OPENPERS_VERSION__ : 'dev';
+
 export interface Config {
   port: number;
   host: string;
@@ -35,7 +39,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     logger: env.LOG_LEVEL !== 'silent',
     startWorker: true,
     secureCookies: appUrl.startsWith('https://'),
-    version: '0.1.0',
+    version: VERSION,
     ...overrides,
     secretKey,
   };

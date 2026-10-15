@@ -1,0 +1,38 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Do not post personal data of real employees** (names, salaries, health data) — use made-up examples.
+        Security problems please report privately, see SECURITY.md.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Steps to reproduce, what you expected and what you saw instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OpenPers version
+      placeholder: e.g. 0.2.0 or commit hash
+    validations:
+      required: true
+  - type: dropdown
+    id: setup
+    attributes:
+      label: Installation
+      options:
+        - Docker Compose (bundled PostgreSQL)
+        - Docker with own PostgreSQL
+        - Node.js with embedded database
+        - Node.js with own PostgreSQL
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log (optional)
+      description: Remove e-mail addresses and other personal data before pasting.
+      render: text

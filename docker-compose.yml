@@ -1,7 +1,9 @@
 services:
   openpers:
+    # Prebuilt release image (set OPENPERS_IMAGE in .env, e.g. ghcr.io/<owner>/openpers:0.2),
+    # or build locally from this checkout with `docker compose up -d --build`.
+    image: ${OPENPERS_IMAGE:-openpers:local}
     build: .
-    image: openpers:latest
     restart: unless-stopped
     ports:
       - "3000:3000"
