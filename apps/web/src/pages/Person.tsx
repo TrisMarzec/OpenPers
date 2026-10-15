@@ -11,7 +11,7 @@ import { Avatar, Button, Checkbox, Dialog, Field, Input, Section, Select, Spinne
 import { AbsenceList, BalanceTable } from './Absences';
 import { DocumentList } from './Documents';
 import { useOrgData, WeekHoursInput } from './People';
-import { TimeWeek } from './Time';
+import { AttendanceList } from '../components/AttendanceList';
 
 type Tab = 'overview' | 'employment' | 'absences' | 'time' | 'documents' | 'account';
 const SELF_FIELDS = ['phone', 'privateAddress', 'emergencyContact', 'preferredName', 'language'];
@@ -480,7 +480,7 @@ export function PersonPage() {
           <AbsenceDialog open={recording} onClose={() => setRecording(false)} personId={p.id} personName={fullName(p)} />
         </div>
       )}
-      {tab === 'time' && <TimeWeek personId={p.id} editable={can('time.manage') || (self && can('time.track'))} />}
+      {tab === 'time' && <AttendanceList personId={p.id} editable={can('time.manage') || (self && can('time.track'))} />}
       {tab === 'documents' && <DocumentList personId={p.id} />}
       {tab === 'account' && <AccountTab person={p} />}
     </div>

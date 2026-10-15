@@ -144,6 +144,13 @@ describe('time tracking', () => {
       expect(days.find((d: any) => d.date === '2026-05-11')).toMatchObject({ targetMinutes: 240, absence: { typeName: 'Urlaub', fraction: 0.5 } });
     });
 
+    it('does not count future days as missing hours in the month difference', async () => {
+      const emp = await newEmployee('Zukunft');
+      const res = await emp.client.get(`/api/v1/attendance/month?personId=${emp.personId}&month=2099-03`);
+      expect(res.body.totals.targetMinutes).toBeGreaterThan(0);
+      expect(res.body.totals.diffMinutes).toBe(0);
+    });
+
     it('auto-deducts the statutory break when configured', async () => {
       await admin.patch('/api/v1/time-settings', { autoDeductBreaks: true });
       const emp = await newEmployee('Auto');

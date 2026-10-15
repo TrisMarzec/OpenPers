@@ -131,7 +131,7 @@ function TimeSettings() {
     if (q.data) setF(q.data);
   }, [q.data]);
   const save = useMutation({
-    mutationFn: () => api.patch('/time-settings', { approvalRequired: f.approvalRequired, lockAfterDays: f.lockAfterDays || null }),
+    mutationFn: () => api.patch('/time-settings', { approvalRequired: f.approvalRequired, autoDeductBreaks: !!f.autoDeductBreaks, lockAfterDays: f.lockAfterDays || null }),
     onSuccess: () => {
       toast(t('common.saved'));
       qc.invalidateQueries({ queryKey: ['time-settings'] });
@@ -145,6 +145,7 @@ function TimeSettings() {
             <FormFields
               fields={[
                 { key: 'approvalRequired', label: t('settings.approvalRequired'), type: 'checkbox' },
+                { key: 'autoDeductBreaks', label: t('settings.autoDeductBreaks'), type: 'checkbox', hint: t('settings.autoDeductBreaksHint') },
                 { key: 'lockAfterDays', label: t('settings.lockAfterDays'), type: 'number', hint: t('settings.lockHint') },
               ]}
               value={f}

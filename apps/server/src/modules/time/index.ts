@@ -234,7 +234,12 @@ export const timeModule: OpenPersModule = {
             warnings: closed.length ? checkArbZG(closed.map((r) => ({ start: r.startAt!, end: r.endAt!, breakMinutes: r.breakMinutes })), prev) : [],
           });
         }
-        const totals = days.reduce((t, d) => ({ targetMinutes: t.targetMinutes + d.targetMinutes, workedMinutes: t.workedMinutes + d.workedMinutes, diffMinutes: t.diffMinutes + d.diffMinutes }), { targetMinutes: 0, workedMinutes: 0, diffMinutes: 0 });
+        // Future days (and today, until something is recorded) are not "missing" hours yet.
+        const today = new Date().toISOString().slice(0, 10);
+        const totals = days.reduce(
+          (t, d) => ({ targetMinutes: t.targetMinutes + d.targetMinutes, workedMinutes: t.workedMinutes + d.workedMinutes, diffMinutes: t.diffMinutes + (d.date < today || d.workedMinutes > 0 ? d.diffMinutes : 0) }),
+          { targetMinutes: 0, workedMinutes: 0, diffMinutes: 0 },
+        );
         return { month: query.month, days, totals };
       },
     );

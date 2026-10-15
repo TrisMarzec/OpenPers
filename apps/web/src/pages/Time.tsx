@@ -6,6 +6,7 @@ import { api, ApiError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { addDaysISO, fmtDate, fmtDay, fmtMinutes, fmtTime, startOfWeek, todayISO } from '../lib/format';
 import { PunchCard } from '../components/PunchCard';
+import { AttendanceList } from '../components/AttendanceList';
 import { Button, cx, Dialog, Field, Input, PageHeader, Section, Select, Stamp, Tabs, Textarea, useErrorText, useToast } from '../components/ui';
 
 interface Entry {
@@ -244,11 +245,11 @@ function TimeApprovals() {
 export function TimePage() {
   const { t } = useTranslation();
   const { me, can } = useAuth();
-  const [tab, setTab] = useState<'week' | 'approvals'>('week');
+  const [tab, setTab] = useState<'list' | 'week' | 'approvals'>(me?.personId ? 'list' : 'approvals');
   return (
     <div>
       <PageHeader title={t('time.title')} />
-      <Tabs value={tab} onChange={setTab} items={[{ value: 'week', label: t('time.tabs.week'), hidden: !me?.personId }, { value: 'approvals', label: t('time.tabs.approvals'), hidden: !can('time.approve') }]} />
+      <Tabs value={tab} onChange={setTab} items={[{ value: 'list', label: t('time.tabs.list'), hidden: !me?.personId }, { value: 'week', label: t('time.tabs.week'), hidden: !me?.personId }, { value: 'approvals', label: t('time.tabs.approvals'), hidden: !can('time.approve') }]} />
       {tab === 'week' && me?.personId && (
         <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
           <TimeWeek personId={me.personId} editable={can('time.track')} />
@@ -257,6 +258,7 @@ export function TimePage() {
           </div>
         </div>
       )}
+      {tab === 'list' && me?.personId && <AttendanceList personId={me.personId} editable={can('time.track')} />}
       {tab === 'approvals' && <TimeApprovals />}
     </div>
   );
