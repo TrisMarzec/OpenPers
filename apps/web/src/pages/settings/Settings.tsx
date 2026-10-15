@@ -8,6 +8,7 @@ import { useAuth } from '../../lib/auth';
 import { cx, Button, Checkbox, Dialog, Field, Input, PageHeader, Section, Spinner, Stamp, Table, useErrorText, useToast } from '../../components/ui';
 import { CrudSection, FormFields, type FieldSpec } from './Crud';
 import { RolesSection } from './Roles';
+import { ChecklistTemplatesSection } from './ChecklistTemplates';
 
 function CompanySettings() {
   const { t } = useTranslation();
@@ -409,6 +410,7 @@ export function SettingsPage() {
     { path: 'time', label: t('settings.sections.time'), show: can('time.manage'), el: <TimeSettings /> },
     { path: 'fields', label: t('settings.sections.fields'), show: can('people.write'), el: <FieldSettings /> },
     { path: 'documents', label: t('settings.sections.documents'), show: can('documents.manage'), el: <DocumentSettings /> },
+    { path: 'onboarding', label: t('settings.sections.onboarding'), show: can('checklists.manage'), el: <ChecklistTemplatesSection /> },
     { path: 'users', label: t('settings.sections.users'), show: can('users.manage'), el: <UserSettings /> },
     { path: 'integrations', label: t('settings.sections.integrations'), show: can('webhooks.manage'), el: <IntegrationSettings /> },
     { path: 'audit', label: t('settings.sections.audit'), show: can('settings.manage'), el: <AuditLog /> },

@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, CalendarDays, Clock, FileText, CircleUser, LayoutGrid, LogOut, Network, Menu, Settings, Users, X } from 'lucide-react';
+import { Briefcase, CalendarDays, Clock, FileText, ChartColumn, CircleUser, ListChecks, LayoutGrid, LogOut, Network, Menu, Settings, Users, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { setLanguage } from '../lib/i18n';
 import { fullName, initials } from '../lib/format';
 import { Avatar, cx } from './ui';
 import { ThemeToggle } from './ThemeToggle';
+import { NotificationBell } from './Notifications';
 
 export function Layout() {
   const { t, i18n } = useTranslation();
@@ -19,16 +20,20 @@ export function Layout() {
   const company = useQuery({ queryKey: ['company'], queryFn: () => api.get('/company') });
   const approvals = useQuery({ queryKey: ['absence-approvals'], queryFn: () => api.get('/absence-approvals'), enabled: can('absence.approve') });
   const pending = approvals.data?.items.length ?? 0;
+  const tasks = useQuery({ queryKey: ['tasks-mine'], queryFn: () => api.get('/tasks/mine'), refetchInterval: 120_000 });
+  const openTasks = tasks.data?.items.length ?? 0;
 
   const items = [
     { to: '/', label: t('nav.dashboard'), icon: LayoutGrid, show: true, end: true },
     { to: '/me', label: t('nav.profile'), icon: CircleUser, show: !!me?.personId },
+    { to: '/tasks', label: t('nav.tasks'), icon: ListChecks, show: true, badge: openTasks },
     { to: '/people', label: t('nav.people'), icon: Users, show: true },
     { to: '/org', label: t('nav.org'), icon: Network, show: true },
     { to: '/absences', label: t('nav.absences'), icon: CalendarDays, show: true, badge: pending },
     { to: '/time', label: t('nav.time'), icon: Clock, show: can('time.track') || can('time.read') },
     { to: '/documents', label: t('nav.documents'), icon: FileText, show: !!me?.personId },
     { to: '/recruiting', label: t('nav.recruiting'), icon: Briefcase, show: can('recruiting.read') },
+    { to: '/analytics', label: t('nav.analytics'), icon: ChartColumn, show: can('analytics.read') },
     { to: '/settings', label: t('nav.settings'), icon: Settings, show: can('settings.manage') || can('org.manage') || can('absence.manage') || can('users.manage') || can('people.write') },
   ];
 
@@ -42,10 +47,11 @@ export function Layout() {
     <nav className="flex h-full flex-col gap-1 p-3">
       <div className="mb-4 flex items-center gap-2 px-2 pt-1">
         <img src="/favicon.svg" alt="" className="size-7" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="font-bold leading-tight">OpenPers</div>
           <div className="truncate text-sm text-ink-faint">{company.data?.name}</div>
         </div>
+        <NotificationBell />
       </div>
       {items
         .filter((i) => i.show)

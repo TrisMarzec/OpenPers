@@ -30,6 +30,9 @@
   /* Text on stamp-coloured (primary) surfaces. */
   --color-on-stamp: #ffffff;
   --color-scrim: rgb(22 35 63 / 0.35);
+  /* Chart series (validated with the dataviz palette checks against the sheet surface). */
+  --color-series-1: #2340c8;
+  --color-series-2: #eb6834;
 
   --radius-ctl: 6px;
 }
@@ -59,6 +62,8 @@
   --color-wait-wash: #352a10;
   --color-on-stamp: #0b1430;
   --color-scrim: rgb(0 0 0 / 0.55);
+  --color-series-1: #6b84f2;
+  --color-series-2: #d95926;
 }
 
 :root[data-theme='light'] {

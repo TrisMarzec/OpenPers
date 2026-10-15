@@ -12,9 +12,10 @@ import { AbsenceList, BalanceTable } from './Absences';
 import { DocumentList } from './Documents';
 import { useOrgData, WeekHoursInput } from './People';
 import { AttendanceList } from '../components/AttendanceList';
+import { PersonChecklists } from '../components/Checklists';
 import { CategoryForm, CompensationSection, OwnAccountSection, ProfileOverview, type Access } from '../components/Profile';
 
-type Tab = 'overview' | 'personal' | 'employment' | 'compensation' | 'payroll' | 'absences' | 'time' | 'documents' | 'account';
+type Tab = 'overview' | 'checklists' | 'personal' | 'employment' | 'compensation' | 'payroll' | 'absences' | 'time' | 'documents' | 'account';
 
 function EmploymentTab({ person, canWrite }: { person: any; canWrite: boolean }) {
   const { t } = useTranslation();
@@ -343,6 +344,7 @@ export function PersonPage({ selfView = false }: { selfView?: boolean }) {
         items={[
           { value: 'overview', label: t('person.tabs.overview') },
           { value: 'personal', label: t('person.tabs.personal') },
+          { value: 'checklists', label: t('checklists.tab') },
           { value: 'employment', label: t('person.tabs.employment'), hidden: access.employment === 'none' },
           { value: 'compensation', label: t('categories.compensation'), hidden: access.compensation === 'none' },
           { value: 'payroll', label: t('categories.payroll'), hidden: access.payroll === 'none' },
@@ -354,6 +356,7 @@ export function PersonPage({ selfView = false }: { selfView?: boolean }) {
       />
       {tab === 'overview' && <ProfileOverview person={p} />}
       {tab === 'personal' && <CategoryForm person={p} categories={['profile', 'contact', 'personal']} />}
+      {tab === 'checklists' && <PersonChecklists personId={p.id} />}
       {tab === 'employment' && <EmploymentTab person={p} canWrite={can('people.write') && access.employment === 'edit'} />}
       {tab === 'compensation' && <CompensationSection person={p} />}
       {tab === 'payroll' && <CategoryForm person={p} categories={['payroll']} />}

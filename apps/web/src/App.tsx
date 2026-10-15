@@ -12,6 +12,8 @@ import { DashboardPage } from './pages/Dashboard';
 import { PeoplePage } from './pages/People';
 import { PersonPage } from './pages/Person';
 import { OrgChartPage } from './pages/OrgChart';
+import { TasksPage } from './pages/Tasks';
+import { AnalyticsPage } from './pages/Analytics';
 import { AbsencesPage } from './pages/Absences';
 import { TimePage } from './pages/Time';
 import { MyDocumentsPage } from './pages/Documents';
@@ -55,6 +57,8 @@ export function App() {
               <Route path="people" element={<PeoplePage />} />
               <Route path="people/:id" element={<PersonPage />} />
               <Route path="org" element={<OrgChartPage />} />
+              <Route path="tasks" element={<TasksPage />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
               <Route path="absences" element={<AbsencesPage />} />
               <Route path="time" element={<TimePage />} />
               <Route path="documents" element={<MyDocumentsPage />} />
