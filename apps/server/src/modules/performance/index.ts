@@ -247,6 +247,13 @@ export const performanceModule: OpenPersModule = {
       },
     );
 
+    route({ method: 'GET', url: '/api/v1/persons/:id/review-cycles', tag: 'performance', summary: 'Cycles in which the person was reviewed' }, async ({ user, params }) => {
+      if (!atLeast(await access(user, params.id), 'view')) throw forbidden();
+      const ids = [...new Set((await db.select({ cycleId: reviews.cycleId }).from(reviews).where(eq(reviews.revieweeId, params.id))).map((r) => r.cycleId))];
+      const items = ids.length ? await db.select().from(reviewCycles).where(inArray(reviewCycles.id, ids)).orderBy(desc(reviewCycles.createdAt)) : [];
+      return { items: items.map(({ id, name, status, periodStart, periodEnd, dueDate }) => ({ id, name, status, periodStart, periodEnd, dueDate })) };
+    });
+
     route({ method: 'POST', url: '/api/v1/review-cycles/:id/release', tag: 'performance', summary: 'Share the results with the reviewee', body: z.object({ personId: z.string().uuid() }) }, async ({ user, params, body }) => {
       const c = await loadCycle(params.id);
       if (body.personId === user.personId || !atLeast(await access(user, body.personId), 'edit')) throw forbidden();

@@ -104,6 +104,13 @@ describe('performance reviews, goals and feedback', () => {
     expect(overview.body.progress).toMatchObject({ submitted: expect.any(Number), total: expect.any(Number) });
   });
 
+  it('lists the cycles a person took part in for permitted viewers', async () => {
+    const list = await mgr.client.get(`/api/v1/persons/${e1.personId}/review-cycles`);
+    expect(list.body.items.map((c: any) => c.id)).toContain(cycle.id);
+    expect((await e1.client.get(`/api/v1/persons/${e1.personId}/review-cycles`)).status).toBe(200);
+    expect((await outsider.client.get(`/api/v1/persons/${e1.personId}/review-cycles`)).status).toBe(403);
+  });
+
   it('manages goals for the employee and the manager only', async () => {
     const goal = await mgr.client.post(`/api/v1/persons/${e1.personId}/goals`, { title: 'Zertifizierung abschließen', dueDate: '2026-12-31' });
     expect(goal.status).toBe(201);
