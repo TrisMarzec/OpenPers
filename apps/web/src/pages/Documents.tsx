@@ -179,7 +179,7 @@ export function DocumentList({ personId }: { personId: string }) {
                 <a href={`/api/v1/documents/${d.id}/download`} aria-label={t('documents.download')} className="inline-flex rounded p-1.5 text-ink-soft hover:bg-rule-soft">
                   <Download size={16} />
                 </a>
-                {full && (
+                {d.manageable && (
                   <button type="button" aria-label={t('common.delete')} className="rounded p-1.5 text-ink-soft hover:bg-refuse-wash hover:text-refuse" onClick={() => confirm(t('common.confirmDelete')) && del.mutate(d.id)}>
                     <Trash2 size={16} />
                   </button>

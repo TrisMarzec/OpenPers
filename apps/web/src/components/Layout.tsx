@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, CalendarDays, Clock, FileText, LayoutGrid, LogOut, Network, Menu, Settings, Users, X } from 'lucide-react';
+import { Briefcase, CalendarDays, Clock, FileText, CircleUser, LayoutGrid, LogOut, Network, Menu, Settings, Users, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { setLanguage } from '../lib/i18n';
@@ -22,6 +22,7 @@ export function Layout() {
 
   const items = [
     { to: '/', label: t('nav.dashboard'), icon: LayoutGrid, show: true, end: true },
+    { to: '/me', label: t('nav.profile'), icon: CircleUser, show: !!me?.personId },
     { to: '/people', label: t('nav.people'), icon: Users, show: true },
     { to: '/org', label: t('nav.org'), icon: Network, show: true },
     { to: '/absences', label: t('nav.absences'), icon: CalendarDays, show: true, badge: pending },

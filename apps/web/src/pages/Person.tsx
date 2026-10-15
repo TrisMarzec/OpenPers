@@ -12,125 +12,9 @@ import { AbsenceList, BalanceTable } from './Absences';
 import { DocumentList } from './Documents';
 import { useOrgData, WeekHoursInput } from './People';
 import { AttendanceList } from '../components/AttendanceList';
+import { CategoryForm, CompensationSection, OwnAccountSection, ProfileOverview, type Access } from '../components/Profile';
 
-type Tab = 'overview' | 'employment' | 'absences' | 'time' | 'documents' | 'account';
-const SELF_FIELDS = ['phone', 'privateAddress', 'emergencyContact', 'preferredName', 'language'];
-
-function PersonalForm({ person, canWrite, self }: { person: any; canWrite: boolean; self: boolean }) {
-  const { t } = useTranslation();
-  const qc = useQueryClient();
-  const toast = useToast();
-  const errText = useErrorText();
-  const defs = useQuery({ queryKey: ['attribute-definitions'], queryFn: () => api.get('/attribute-definitions') });
-  const [f, setF] = useState<any>(person);
-  const [attrs, setAttrs] = useState<Record<string, unknown>>(person.attributes ?? {});
-  useEffect(() => {
-    setF(person);
-    setAttrs(person.attributes ?? {});
-  }, [person]);
-  const editable = (k: string) => canWrite || (self && SELF_FIELDS.includes(k));
-  const save = useMutation({
-    mutationFn: async () => {
-      const keys = ['firstName', 'lastName', 'preferredName', 'email', 'gender', 'birthDate', 'phone', 'privateAddress', 'emergencyContact', 'language'].filter(editable);
-      const body = Object.fromEntries(keys.map((k) => [k, f[k] === '' ? null : f[k]]).filter(([k, v]) => v !== null || !['firstName', 'lastName', 'email', 'gender', 'language'].includes(k as string)));
-      await api.patch(`/persons/${person.id}`, body);
-      if (canWrite && defs.data?.items.length) {
-        const changed = Object.fromEntries(Object.entries(attrs).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(person.attributes?.[k])).map(([k, v]) => [k, v === '' ? null : v]));
-        if (Object.keys(changed).length) await api.put(`/persons/${person.id}/attributes`, changed);
-      }
-    },
-    onSuccess: () => {
-      toast(t('common.saved'));
-      qc.invalidateQueries({ queryKey: ['person', person.id] });
-    },
-    onError: (e) => toast(errText(e), 'error'),
-  });
-  const input = (k: string, type = 'text') => <Input type={type} value={f[k] ?? ''} disabled={!editable(k)} onChange={(e) => setF({ ...f, [k]: e.target.value })} />;
-  return (
-    <div className="grid gap-5">
-      {self && !canWrite && <p className="text-ink-soft">{t('person.selfServiceHint')}</p>}
-      <Section title={t('person.tabs.overview')}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('person.firstName')}>{input('firstName')}</Field>
-          <Field label={t('person.lastName')}>{input('lastName')}</Field>
-          <Field label={t('person.preferredName')}>{input('preferredName')}</Field>
-          <Field label={t('person.email')}>{input('email', 'email')}</Field>
-          <Field label={t('person.gender')}>
-            <Select value={f.gender} disabled={!editable('gender')} onChange={(e) => setF({ ...f, gender: e.target.value })}>
-              {Object.entries(t('person.genders', { returnObjects: true }) as Record<string, string>).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t('person.birthDate')}>{input('birthDate', 'date')}</Field>
-          <Field label={t('person.phone')}>{input('phone', 'tel')}</Field>
-          <Field label={t('person.language')}>
-            <Select value={f.language} disabled={!editable('language')} onChange={(e) => setF({ ...f, language: e.target.value })}>
-              <option value="de">Deutsch</option>
-              <option value="en">English</option>
-            </Select>
-          </Field>
-          <Field label={t('person.privateAddress')} className="sm:col-span-2">
-            <Textarea rows={2} value={f.privateAddress ?? ''} disabled={!editable('privateAddress')} onChange={(e) => setF({ ...f, privateAddress: e.target.value })} />
-          </Field>
-          <Field label={t('person.emergencyContact')} className="sm:col-span-2">
-            <Input value={f.emergencyContact ?? ''} disabled={!editable('emergencyContact')} onChange={(e) => setF({ ...f, emergencyContact: e.target.value })} />
-          </Field>
-        </div>
-      </Section>
-      {(defs.data?.items ?? []).length > 0 && (
-        <Section title={t('person.customFields')}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {defs.data.items
-              .filter((d: any) => !d.sensitive || d.key in attrs || canWrite)
-              .map((d: any) =>
-                d.type === 'boolean' ? (
-                  <div key={d.id} className="self-end pb-2">
-                    <Checkbox label={d.label} checked={!!attrs[d.key]} onChange={(v) => canWrite && setAttrs({ ...attrs, [d.key]: v })} />
-                  </div>
-                ) : (
-                <Field
-                  key={d.id}
-                  label={
-                    <span className="inline-flex items-center gap-1.5">
-                      {d.label}
-                      {d.sensitive && <Lock size={13} aria-label={t('person.sensitive')} className="text-ink-faint" />}
-                    </span>
-                  }
-                >
-                  {d.type === 'select' ? (
-                    <Select value={(attrs[d.key] as string) ?? ''} disabled={!canWrite} onChange={(e) => setAttrs({ ...attrs, [d.key]: e.target.value })}>
-                      <option value="">–</option>
-                      {(d.options ?? []).map((o: string) => (
-                        <option key={o}>{o}</option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Input
-                      type={d.type === 'number' ? 'number' : d.type === 'date' ? 'date' : 'text'}
-                      value={(attrs[d.key] as string) ?? ''}
-                      disabled={!canWrite}
-                      onChange={(e) => setAttrs({ ...attrs, [d.key]: d.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value })}
-                    />
-                  )}
-                </Field>
-                ),
-              )}
-          </div>
-        </Section>
-      )}
-      {(canWrite || self) && (
-        <div className="flex justify-end">
-          <Button variant="primary" busy={save.isPending} onClick={() => save.mutate()}>
-            {t('common.save')}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-}
+type Tab = 'overview' | 'personal' | 'employment' | 'compensation' | 'payroll' | 'absences' | 'time' | 'documents' | 'account';
 
 function EmploymentTab({ person, canWrite }: { person: any; canWrite: boolean }) {
   const { t } = useTranslation();
@@ -392,16 +276,17 @@ function AccountTab({ person }: { person: any }) {
   );
 }
 
-export function PersonPage() {
-  const { id } = useParams();
+export function PersonPage({ selfView = false }: { selfView?: boolean }) {
+  const params = useParams();
   const { t } = useTranslation();
   const { me, can } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const navigate = useNavigate();
+  const id = selfView ? me?.personId : params.id;
   const [tab, setTab] = useState<Tab>('overview');
   const [recording, setRecording] = useState(false);
-  const q = useQuery({ queryKey: ['person', id], queryFn: () => api.get(`/persons/${id}`) });
+  const q = useQuery({ queryKey: ['person', id], queryFn: () => api.get(`/persons/${id}`), enabled: !!id });
   const anonymize = useMutation({
     mutationFn: () => api.post(`/persons/${id}/anonymize`),
     onSuccess: () => {
@@ -410,11 +295,12 @@ export function PersonPage() {
       navigate('/people');
     },
   });
+  if (!id) return <p className="text-ink-soft">{t('profile.noPerson')}</p>;
   if (q.isLoading) return <Spinner />;
   if (q.isError) return <p className="text-refuse">{t('common.forbidden')}</p>;
   const p = q.data;
   const self = p.id === me?.personId;
-  const canWrite = can('people.write');
+  const access: Access = p.access;
   const emp = p.currentEmployment;
 
   const exportData = async () => {
@@ -430,12 +316,11 @@ export function PersonPage() {
   return (
     <div>
       <header className="mb-5 flex flex-wrap items-center gap-4 border-b border-rule pb-5">
-        <Avatar name={initials(p)} size={56} />
+        <Avatar name={initials(p)} size={64} />
         <div className="min-w-0 flex-1">
+          {selfView && <p className="text-sm font-semibold text-stamp">{t('nav.profile')}</p>}
           <h1 className="text-2xl font-bold">{fullName(p)}</h1>
-          <p className="text-ink-soft">
-            {[emp?.positionTitle, emp?.orgUnits?.map((o: any) => o.name).join(', ')].filter(Boolean).join(' – ') || p.email}
-          </p>
+          <p className="text-ink-soft">{[emp?.positionTitle, emp?.orgUnits?.map((o: any) => o.name).join(', ')].filter(Boolean).join(' – ') || p.email}</p>
           {p.anonymizedAt && <p className="text-sm text-refuse">{t('person.anonymized', { date: fmtDate(p.anonymizedAt.slice(0, 10)) })}</p>}
         </div>
         {emp && <Stamp status={emp.status} />}
@@ -445,7 +330,7 @@ export function PersonPage() {
               {t('person.exportData')}
             </Button>
           )}
-          {can('people.write', 'all') && !p.anonymizedAt && (
+          {!self && can('people.write', 'all') && !p.anonymizedAt && (
             <Button size="sm" variant="danger" onClick={() => confirm(t('person.anonymizeConfirm')) && anonymize.mutate()}>
               {t('person.anonymize')}
             </Button>
@@ -457,18 +342,24 @@ export function PersonPage() {
         onChange={setTab}
         items={[
           { value: 'overview', label: t('person.tabs.overview') },
-          { value: 'employment', label: t('person.tabs.employment') },
+          { value: 'personal', label: t('person.tabs.personal') },
+          { value: 'employment', label: t('person.tabs.employment'), hidden: access.employment === 'none' },
+          { value: 'compensation', label: t('categories.compensation'), hidden: access.compensation === 'none' },
+          { value: 'payroll', label: t('categories.payroll'), hidden: access.payroll === 'none' },
           { value: 'absences', label: t('person.tabs.absences'), hidden: !can('absence.read') },
           { value: 'time', label: t('person.tabs.time'), hidden: !can('time.read') },
-          { value: 'documents', label: t('person.tabs.documents'), hidden: !can('documents.read') },
-          { value: 'account', label: t('person.tabs.account'), hidden: !can('users.manage') },
+          { value: 'documents', label: t('person.tabs.documents'), hidden: !can('documents.read') && !can('documents.write') },
+          { value: 'account', label: t('person.tabs.account'), hidden: !self && !can('users.manage') },
         ]}
       />
-      {tab === 'overview' && <PersonalForm person={p} canWrite={canWrite} self={self} />}
-      {tab === 'employment' && <EmploymentTab person={p} canWrite={canWrite} />}
+      {tab === 'overview' && <ProfileOverview person={p} />}
+      {tab === 'personal' && <CategoryForm person={p} categories={['profile', 'contact', 'personal']} />}
+      {tab === 'employment' && <EmploymentTab person={p} canWrite={can('people.write') && access.employment === 'edit'} />}
+      {tab === 'compensation' && <CompensationSection person={p} />}
+      {tab === 'payroll' && <CategoryForm person={p} categories={['payroll']} />}
       {tab === 'absences' && (
         <div>
-          {can('absence.manage') && (
+          {can('absence.manage') && !self && (
             <div className="mb-3 flex justify-end">
               <Button variant="primary" onClick={() => setRecording(true)}>
                 {t('absence.record')}
@@ -482,7 +373,7 @@ export function PersonPage() {
       )}
       {tab === 'time' && <AttendanceList personId={p.id} editable={can('time.manage') || (self && can('time.track'))} />}
       {tab === 'documents' && <DocumentList personId={p.id} />}
-      {tab === 'account' && <AccountTab person={p} />}
+      {tab === 'account' && (self ? <OwnAccountSection /> : <AccountTab person={p} />)}
     </div>
   );
 }

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PERMISSIONS, REGION_NAMES } from '@openpers/shared';
+import { DATA_CATEGORIES, REGION_NAMES } from '@openpers/shared';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { cx, Button, Checkbox, Dialog, Field, Input, PageHeader, Section, Spinner, Stamp, Table, useErrorText, useToast } from '../../components/ui';
 import { CrudSection, FormFields, type FieldSpec } from './Crud';
+import { RolesSection } from './Roles';
 
 function CompanySettings() {
   const { t } = useTranslation();
@@ -181,11 +182,12 @@ function FieldSettings() {
     <CrudSection
       title={t('settings.sections.fields')}
       path="/attribute-definitions"
-      defaults={{ type: 'text', section: 'general', sensitive: false }}
+      defaults={{ type: 'text', section: 'general', sensitive: false, category: 'employment' }}
       fields={[
         { key: 'label', label: t('settings.fieldLabel') },
         { key: 'key', label: t('settings.fieldKey'), createOnly: true, hint: 'a–z, 0–9, _' },
         { key: 'type', label: t('settings.fieldType'), type: 'select', required: true, createOnly: true, options: Object.entries(types).map(([value, label]) => ({ value, label })) },
+        { key: 'category', label: t('access.category'), type: 'select', required: true, options: DATA_CATEGORIES.map((c) => ({ value: c, label: t(`categories.${c}`) })), hint: t('access.fieldCategoryHint') },
         { key: 'options', label: t('settings.options'), type: 'list', column: false },
         { key: 'sensitive', label: t('person.sensitive'), type: 'checkbox', createOnly: true, hint: t('settings.sensitiveHint') },
       ]}
@@ -198,7 +200,7 @@ function DocumentSettings() {
   const cats = useQuery({ queryKey: ['document-categories'], queryFn: () => api.get('/document-categories') });
   return (
     <div className="grid gap-5">
-      <CrudSection title={t('settings.documentCategories')} path="/document-categories" fields={[{ key: 'name', label: t('common.name') }, { key: 'employeeVisible', label: t('documents.visible'), type: 'checkbox' }]} />
+      <CrudSection title={t('settings.documentCategories')} path="/document-categories" defaults={{ dataCategory: 'employment' }} fields={[{ key: 'name', label: t('common.name') }, { key: 'dataCategory', label: t('access.category'), type: 'select', required: true, options: DATA_CATEGORIES.map((c) => ({ value: c, label: t(`categories.${c}`) })), hint: t('access.docCategoryHint') }, { key: 'employeeVisible', label: t('documents.visible'), type: 'checkbox' }]} />
       <CrudSection
         title={t('settings.templates')}
         path="/document-templates"
@@ -240,17 +242,7 @@ function UserSettings() {
           </Table>
         )}
       </Section>
-      <CrudSection
-        title={t('settings.roles')}
-        path="/roles"
-        defaults={{ defaultScope: 'self', permissions: [] }}
-        fields={[
-          { key: 'name', label: t('common.name') },
-          { key: 'key', label: t('settings.fieldKey'), createOnly: true, column: false },
-          { key: 'defaultScope', label: t('settings.scope'), type: 'select', required: true, options: Object.entries(scopes).map(([value, label]) => ({ value, label })) },
-          { key: 'permissions', label: t('settings.permissions'), type: 'list', hint: PERMISSIONS.join(', '), render: (r) => <span className="text-sm text-ink-soft">{r.permissions.length}</span> },
-        ]}
-      />
+      <RolesSection />
     </div>
   );
 }

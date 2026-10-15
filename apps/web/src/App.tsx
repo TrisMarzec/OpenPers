@@ -51,6 +51,7 @@ export function App() {
               }
             >
               <Route index element={<DashboardPage />} />
+              <Route path="me" element={<PersonPage selfView />} />
               <Route path="people" element={<PeoplePage />} />
               <Route path="people/:id" element={<PersonPage />} />
               <Route path="org" element={<OrgChartPage />} />

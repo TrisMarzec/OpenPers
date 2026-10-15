@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth';
 import { addDaysISO, fmtDate, fmtDay, fmtMinutes, fmtTime, startOfWeek, todayISO } from '../lib/format';
 import { PunchCard } from '../components/PunchCard';
 import { AttendanceList } from '../components/AttendanceList';
+import { TeamTimes } from '../components/TeamTimes';
 import { Button, cx, Dialog, Field, Input, PageHeader, Section, Select, Stamp, Tabs, Textarea, useErrorText, useToast } from '../components/ui';
 
 interface Entry {
@@ -245,11 +246,13 @@ function TimeApprovals() {
 export function TimePage() {
   const { t } = useTranslation();
   const { me, can } = useAuth();
-  const [tab, setTab] = useState<'list' | 'week' | 'approvals'>(me?.personId ? 'list' : 'approvals');
+  // The team view is for anyone who may see more than their own times (managers, HR).
+  const seesTeam = (me?.permissions['time.read'] ?? []).some((s) => s !== 'self');
+  const [tab, setTab] = useState<'list' | 'week' | 'team' | 'approvals'>(me?.personId ? 'list' : seesTeam ? 'team' : 'approvals');
   return (
     <div>
       <PageHeader title={t('time.title')} />
-      <Tabs value={tab} onChange={setTab} items={[{ value: 'list', label: t('time.tabs.list'), hidden: !me?.personId }, { value: 'week', label: t('time.tabs.week'), hidden: !me?.personId }, { value: 'approvals', label: t('time.tabs.approvals'), hidden: !can('time.approve') }]} />
+      <Tabs value={tab} onChange={setTab} items={[{ value: 'list', label: t('time.tabs.list'), hidden: !me?.personId }, { value: 'week', label: t('time.tabs.week'), hidden: !me?.personId }, { value: 'team', label: t('time.tabs.team'), hidden: !seesTeam }, { value: 'approvals', label: t('time.tabs.approvals'), hidden: !can('time.approve') }]} />
       {tab === 'week' && me?.personId && (
         <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
           <TimeWeek personId={me.personId} editable={can('time.track')} />
@@ -259,6 +262,7 @@ export function TimePage() {
         </div>
       )}
       {tab === 'list' && me?.personId && <AttendanceList personId={me.personId} editable={can('time.track')} />}
+      {tab === 'team' && <TeamTimes />}
       {tab === 'approvals' && <TimeApprovals />}
     </div>
   );
