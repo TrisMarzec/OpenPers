@@ -14,6 +14,7 @@ interface DirPerson {
   firstName: string;
   lastName: string;
   preferredName: string | null;
+  photoUrl: string | null;
   email: string;
   positionTitle: string | null;
   supervisorPersonId: string | null;
@@ -38,7 +39,7 @@ function PersonCard({ person, linkable, highlight, reports, open, onToggle }: { 
   return (
     <div className={cx('w-56 rounded-md border bg-sheet text-left', highlight ? 'border-stamp ring-2 ring-stamp/40' : 'border-rule')}>
       <div className="flex items-center gap-2.5 p-2.5">
-        <Avatar name={initials(person)} size={36} />
+        <Avatar name={initials(person)} size={36} src={person.photoUrl} />
         <div className="min-w-0">
           {linkable ? (
             <Link to={`/people/${person.id}`} className="block truncate font-bold text-ink hover:text-stamp hover:underline">
@@ -95,7 +96,7 @@ function UnitBranch({ node, state, people }: { node: UnitNode<Unit, DirPerson>; 
         <div className="flex flex-col gap-1 p-2">
           {node.members.slice(0, open ? undefined : 4).map((m) => (
             <div key={m.id} className="flex items-center gap-2">
-              <Avatar name={initials(m)} size={22} />
+              <Avatar name={initials(m)} size={22} src={m.photoUrl} />
               {state.linkable(m.id) ? (
                 <Link to={`/people/${m.id}`} className={cx('truncate text-sm hover:text-stamp hover:underline', state.highlight.has(m.id) && 'font-bold text-stamp')}>
                   {fullName(m)}

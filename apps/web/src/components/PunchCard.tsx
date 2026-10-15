@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
-import { fmtMinutes, fmtTime, todayISO } from '../lib/format';
+import { fmtDate, fmtMinutes, fmtTime, todayISO } from '../lib/format';
 import { Button, useErrorText, useToast } from './ui';
 
 interface Period {
@@ -79,5 +79,17 @@ export function PunchCard() {
         </div>
       </div>
     </section>
+  );
+}
+
+/** Flextime balance with the date tracking started; a hint instead of 0:00 before the first entry. */
+export function BalanceFigure({ balance }: { balance: { balanceMinutes: number; trackingSince: string | null } }) {
+  const { t } = useTranslation();
+  if (!balance.trackingSince) return <p className="text-sm text-ink-soft">{t('time.noTracking')}</p>;
+  return (
+    <>
+      <p className={`tnum text-2xl font-bold ${balance.balanceMinutes < 0 ? 'text-refuse' : ''}`}>{fmtMinutes(balance.balanceMinutes, true)}</p>
+      <p className="text-xs text-ink-faint">{t('time.balanceSince', { date: fmtDate(balance.trackingSince) })}</p>
+    </>
   );
 }

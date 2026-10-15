@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth';
 import { fmtDate, fmtMinutes, fmtTime, fullName, initials, parseISO, toISO, todayISO } from '../lib/format';
 import { AttendanceList } from './AttendanceList';
 import { Avatar, Button, cx, Empty, Input, Select, Spinner } from './ui';
+import { PersonAvatar } from './Photo';
 
 interface TeamRow {
   person: { id: string; firstName: string; lastName: string; preferredName: string | null; positionTitle: string | null };
@@ -92,7 +93,7 @@ export function TeamTimes() {
                       <td className="py-2 pl-3">
                         <button type="button" onClick={() => setOpen(expanded ? null : r.person.id)} aria-expanded={expanded} className="flex items-center gap-2.5 text-left">
                           {expanded ? <ChevronDown size={16} className="text-ink-faint" aria-hidden /> : <ChevronRight size={16} className="text-ink-faint" aria-hidden />}
-                          <Avatar name={initials(r.person)} size={28} />
+                          <PersonAvatar person={r.person} size={28} />
                           <span>
                             <span className="block font-semibold">{fullName(r.person)}</span>
                             <span className="block text-xs text-ink-faint">{r.person.positionTitle ?? ''}</span>

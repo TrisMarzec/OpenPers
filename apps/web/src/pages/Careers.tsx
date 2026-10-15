@@ -6,8 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
 import { Markdown } from '../components/Markdown';
 import { Button, Checkbox, Empty, Field, Input, Spinner, Textarea } from '../components/ui';
+import { useBranding } from '../components/Photo';
 
 function CareersShell({ company, children }: { company?: string | null; children: ReactNode }) {
+  const branding = useBranding();
   // The public careers page follows the visitor's system preference, not the app default.
   useEffect(() => {
     applyTheme('system');
@@ -17,7 +19,8 @@ function CareersShell({ company, children }: { company?: string | null; children
     <div className="min-h-screen bg-sheet">
       <header className="border-b border-rule">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4">
-          <Link to="/careers" className="text-lg font-bold">
+          <Link to="/careers" className="flex items-center gap-3 text-lg font-bold">
+            {branding?.logoUrl && <img src={branding.logoUrl} alt="" className="h-9 w-auto max-w-[12rem] object-contain" />}
             {company ?? ''}
           </Link>
         </div>

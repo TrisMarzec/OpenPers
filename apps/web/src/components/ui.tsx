@@ -1,4 +1,4 @@
-import { createContext, forwardRef, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import { createContext, forwardRef, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type KeyboardEvent, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { ApiError } from '../lib/api';
@@ -154,22 +154,48 @@ export function Empty({ children, action }: { children: ReactNode; action?: Reac
 }
 
 export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { value: T; label: ReactNode; hidden?: boolean }[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fade, setFade] = useState<'none' | 'start' | 'end' | 'both'>('none');
+  const visible = items.filter((i) => !i.hidden);
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const start = el.scrollLeft > 4;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+    setFade(start && end ? 'both' : start ? 'start' : end ? 'end' : 'none');
+  }, []);
+  useEffect(() => {
+    measure();
+    // Keep the selected tab in view, e.g. when opened via ?tab= on a narrow screen.
+    ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure, value, visible.length]);
+  // Arrow keys move between tabs (WAI-ARIA tabs pattern).
+  const onKeyDown = (e: KeyboardEvent) => {
+    const idx = visible.findIndex((i) => i.value === value);
+    const next = e.key === 'ArrowRight' ? idx + 1 : e.key === 'ArrowLeft' ? idx - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? visible.length - 1 : -2;
+    if (next === -2) return;
+    e.preventDefault();
+    const target = visible[(next + visible.length) % visible.length];
+    onChange(target.value);
+    requestAnimationFrame(() => ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus());
+  };
   return (
-    <div role="tablist" className="mb-5 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-rule)]">
-      {items
-        .filter((i) => !i.hidden)
-        .map((i) => (
-          <button
-            key={i.value}
-            role="tab"
-            type="button"
-            aria-selected={value === i.value}
-            onClick={() => onChange(i.value)}
-            className={cx('border-b-2 px-3 py-2 font-semibold whitespace-nowrap', value === i.value ? 'border-stamp text-stamp' : 'border-transparent text-ink-soft hover:text-ink')}
-          >
-            {i.label}
-          </button>
-        ))}
+    <div ref={ref} role="tablist" data-fade={fade} onScroll={measure} onKeyDown={onKeyDown} className="tabstrip mb-5 flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-rule)]">
+      {visible.map((i) => (
+        <button
+          key={i.value}
+          role="tab"
+          type="button"
+          aria-selected={value === i.value}
+          tabIndex={value === i.value ? 0 : -1}
+          onClick={() => onChange(i.value)}
+          className={cx('border-b-2 px-3 py-2 font-semibold whitespace-nowrap', value === i.value ? 'border-stamp text-stamp' : 'border-transparent text-ink-soft hover:text-ink')}
+        >
+          {i.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -198,8 +224,13 @@ export function Spinner() {
   return <p className="py-6 text-ink-faint">{t('common.loading')}</p>;
 }
 
-export function Avatar({ name, size = 32 }: { name: string; size?: number }) {
+export function Avatar({ name, size = 32, src }: { name: string; size?: number; src?: string | null }) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
   const hue = [...name].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  if (src && !failed) {
+    return <img src={src} alt="" width={size} height={size} loading="lazy" onError={() => setFailed(true)} className="shrink-0 rounded-full bg-rule-soft object-cover" style={{ width: size, height: size }} />;
+  }
   return (
     <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full font-bold text-white" style={{ width: size, height: size, fontSize: size * 0.38, background: `hsl(${hue} 45% 38%)` }}>
       {name}

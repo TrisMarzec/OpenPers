@@ -200,7 +200,7 @@ export function PeoplePage() {
               <tr key={p.id} className={linkable ? 'hover:bg-paper' : ''}>
                 <td>
                   <div className="flex items-center gap-3">
-                    <Avatar name={initials(p)} />
+                    <Avatar name={initials(p)} src={p.photoUrl} />
                     <div>
                       {linkable ? (
                         <Link to={`/people/${p.id}`} className="font-semibold text-ink hover:text-stamp hover:underline">

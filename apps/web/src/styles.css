@@ -200,3 +200,20 @@ dialog::backdrop {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Horizontal tab strips scroll without a native scrollbar; edges fade when more tabs are hidden. */
+.tabstrip {
+  scrollbar-width: none;
+}
+.tabstrip::-webkit-scrollbar {
+  display: none;
+}
+.tabstrip[data-fade='end'] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 3rem), transparent);
+}
+.tabstrip[data-fade='start'] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 3rem), transparent);
+}
+.tabstrip[data-fade='both'] {
+  mask-image: linear-gradient(to right, transparent, #000 3rem, #000 calc(100% - 3rem), transparent);
+}

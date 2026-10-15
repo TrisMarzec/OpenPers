@@ -9,6 +9,8 @@ import { AbsenceDialog } from '../components/AbsenceDialog';
 import { PunchCard } from '../components/PunchCard';
 import { ApprovalList } from './Absences';
 import { Avatar, Button, Section, Stamp, Swatch } from '../components/ui';
+import { BalanceFigure } from '../components/PunchCard';
+import { PersonAvatar } from '../components/Photo';
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -52,7 +54,7 @@ export function DashboardPage() {
           )}
           {timeBalance.data && (
             <Section title={t('dashboard.overtime')}>
-              <p className={`tnum text-2xl font-bold ${timeBalance.data.balanceMinutes < 0 ? 'text-refuse' : ''}`}>{fmtMinutes(timeBalance.data.balanceMinutes, true)}</p>
+              <BalanceFigure balance={timeBalance.data} />
             </Section>
           )}
         </div>
@@ -68,7 +70,7 @@ export function DashboardPage() {
               <ul className="grid gap-2">
                 {calendar.data.items.map((a: any) => (
                   <li key={a.id} className="flex items-center gap-3">
-                    <Avatar name={initials(a)} size={28} />
+                    <PersonAvatar person={{ ...a, id: a.personId }} size={28} />
                     <span className="flex-1 font-semibold">{fullName(a)}</span>
                     <span className="flex items-center gap-1.5 text-sm text-ink-soft">
                       <Swatch color={a.color} /> {a.typeName}

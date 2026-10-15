@@ -8,7 +8,7 @@ export interface Me {
   personId: string | null;
   locale: 'de' | 'en';
   permissions: Record<string, string[]>;
-  person: { firstName: string; lastName: string; preferredName: string | null } | null;
+  person: { firstName: string; lastName: string; preferredName: string | null; photoUrl: string | null } | null;
 }
 
 interface AuthState {

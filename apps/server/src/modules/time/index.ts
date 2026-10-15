@@ -169,9 +169,14 @@ export const timeModule: OpenPersModule = {
     // By default the balance runs until yesterday: the current day is not finished yet.
     const to = qTo ?? addDays(new Date().toISOString().slice(0, 10), -1);
     const emp = await currentEmployment(db, personId, to);
-    const from = qFrom ?? emp?.startDate ?? to;
+    // Time tracking starts with the first recorded workday: earlier months were never tracked and
+    // must not show up as missing hours.
+    const [first] = await db.select({ date: attendancePeriods.date }).from(attendancePeriods).where(and(eq(attendancePeriods.personId, personId), eq(attendancePeriods.type, 'WORK'), ne(attendancePeriods.status, 'rejected'))).orderBy(asc(attendancePeriods.date)).limit(1);
+    const trackingSince = first?.date ?? null;
+    const defaultFrom = trackingSince ? [emp?.startDate, trackingSince].filter(Boolean).sort().at(-1)! : addDays(to, 1);
+    const from = qFrom ?? defaultFrom;
     if (qFrom && qTo && from > to) throw unprocessable('Invalid range', [{ path: 'from', message: 'from must not be after to' }]);
-    if (from > to) return { from, to, targetMinutes: 0, workedMinutes: 0, balanceMinutes: 0 };
+    if (from > to) return { from, to, trackingSince, targetMinutes: 0, workedMinutes: 0, balanceMinutes: 0 };
     const region = (await regionOf(db, personId, to)) as Region;
     const schedules = await schedulesOf(db, personId);
     const absenceRows = await db
@@ -190,7 +195,7 @@ export const timeModule: OpenPersModule = {
     const rows = await db.select().from(attendancePeriods).where(and(eq(attendancePeriods.personId, personId), eq(attendancePeriods.type, 'WORK'), gte(attendancePeriods.date, from), lte(attendancePeriods.date, to), ne(attendancePeriods.status, 'rejected')));
     const worked = rows.filter((r) => r.endAt).map((r) => ({ date: r.date, minutes: minutesBetween(norm(r.startAt)!, norm(r.endAt)!) - r.breakMinutes }));
     const customHolidays = await customHolidaysFor(db, region, from, to);
-    return { from, to, ...computeTimeBalance({ from, to, schedules, region, absences, worked, customHolidays }) };
+    return { from, to, trackingSince, ...computeTimeBalance({ from, to, schedules, region, absences, worked, customHolidays }) };
     }
 
     ctx.services.timeBalanceOf = (personId: string) => balanceOf(personId);

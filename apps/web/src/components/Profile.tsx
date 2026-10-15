@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { fmtDate, fmtMinutes, fmtNumber, fullName, todayISO } from '../lib/format';
 import { Button, Checkbox, Dialog, Empty, Field, Input, Section, Select, Table, Textarea, useErrorText, useToast } from './ui';
+import { BalanceFigure } from './PunchCard';
 import { ThemeToggle } from './ThemeToggle';
 import { setLanguage } from '../lib/i18n';
 
@@ -100,7 +101,7 @@ export function ProfileOverview({ person }: { person: any }) {
         )}
         {timeBalance.data && (
           <Section title={t('dashboard.overtime')}>
-            <p className={`tnum text-2xl font-bold ${timeBalance.data.balanceMinutes < 0 ? 'text-refuse' : ''}`}>{fmtMinutes(timeBalance.data.balanceMinutes, true)}</p>
+            <BalanceFigure balance={timeBalance.data} />
           </Section>
         )}
         <Section title={t('profile.yourAccess')}>

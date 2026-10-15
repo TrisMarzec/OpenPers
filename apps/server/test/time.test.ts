@@ -80,6 +80,16 @@ describe('time tracking', () => {
     expect(bal.body.balanceMinutes).toBe(0);
   });
 
+  it('starts the default balance with the first tracked day, not the hire date', async () => {
+    const emp = await newEmployee('Lena', '2025-01-01');
+    const none = await emp.client.get(`/api/v1/persons/${emp.personId}/time-balance`);
+    expect(none.body).toMatchObject({ balanceMinutes: 0, trackingSince: null });
+    // Mon 2026-06-15, 8h scheduled: the months before tracking started must not count as missing time.
+    await emp.client.post('/api/v1/attendance', entry('2026-06-15', '08:00', '16:30'));
+    const bal = await emp.client.get(`/api/v1/persons/${emp.personId}/time-balance?to=2026-06-15`);
+    expect(bal.body).toMatchObject({ from: '2026-06-15', trackingSince: '2026-06-15', targetMinutes: 480, workedMinutes: 510, balanceMinutes: 30 });
+  });
+
   it('requires approval when configured and lets managers approve', async () => {
     expect((await admin.patch('/api/v1/time-settings', { approvalRequired: true })).status).toBe(200);
     const emp = await newEmployee('Paul');

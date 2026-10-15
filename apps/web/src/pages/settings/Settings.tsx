@@ -9,6 +9,7 @@ import { cx, Button, Checkbox, Dialog, Field, Input, PageHeader, Section, Spinne
 import { CrudSection, FormFields, type FieldSpec } from './Crud';
 import { RolesSection } from './Roles';
 import { ChecklistTemplatesSection } from './ChecklistTemplates';
+import { LogoEditor } from '../../components/Photo';
 
 function CompanySettings() {
   const { t } = useTranslation();
@@ -37,6 +38,9 @@ function CompanySettings() {
   ];
   return (
     <Section title={t('settings.sections.company')}>
+      <div className="mb-6 border-b border-rule pb-6">
+        <LogoEditor />
+      </div>
       <div className="max-w-md">
         <FormFields fields={fields} value={f} onChange={setF} />
         <Button variant="primary" className="mt-4" busy={save.isPending} onClick={() => save.mutate()}>

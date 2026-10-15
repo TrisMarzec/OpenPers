@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth';
 import { fmtDate, fullName, initials, todayISO } from '../lib/format';
 import { AbsenceDialog } from '../components/AbsenceDialog';
 import { PersonPerformance } from '../components/Performance';
+import { PhotoEditor } from '../components/Photo';
 import { Avatar, Button, Checkbox, Dialog, Field, Input, Section, Select, Spinner, Stamp, Table, Tabs, Textarea, useErrorText, useToast } from '../components/ui';
 import { AbsenceList, BalanceTable } from './Absences';
 import { DocumentList } from './Documents';
@@ -318,7 +319,7 @@ export function PersonPage({ selfView = false }: { selfView?: boolean }) {
   return (
     <div>
       <header className="mb-5 flex flex-wrap items-center gap-4 border-b border-rule pb-5">
-        <Avatar name={initials(p)} size={64} />
+        <PhotoEditor person={p} editable={!p.anonymizedAt && (self || access.profile === 'edit')} />
         <div className="min-w-0 flex-1">
           {selfView && <p className="text-sm font-semibold text-stamp">{t('nav.profile')}</p>}
           <h1 className="text-2xl font-bold">{fullName(p)}</h1>

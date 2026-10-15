@@ -52,11 +52,17 @@ export function Layout() {
   const nav = (
     <nav className="flex h-full flex-col gap-1 p-3">
       <div className="mb-4 flex items-center gap-2 px-2 pt-1">
-        <img src="/favicon.svg" alt="" className="size-7" />
-        <div className="min-w-0 flex-1">
-          <div className="font-bold leading-tight">OpenPers</div>
-          <div className="truncate text-sm text-ink-faint">{company.data?.name}</div>
-        </div>
+        {company.data?.logoUrl ? (
+          <img src={company.data.logoUrl} alt={company.data.name} className="h-8 max-w-[10rem] min-w-0 flex-1 object-contain object-left" />
+        ) : (
+          <>
+            <img src="/favicon.svg" alt="" className="size-7" />
+            <div className="min-w-0 flex-1">
+              <div className="font-bold leading-tight">OpenPers</div>
+              <div className="truncate text-sm text-ink-faint">{company.data?.name}</div>
+            </div>
+          </>
+        )}
         <NotificationBell />
       </div>
       {items
@@ -76,7 +82,7 @@ export function Layout() {
         ))}
       <div className="mt-auto border-t border-rule pt-3">
         <div className="flex items-center gap-2 px-2 pb-2">
-          <Avatar name={initials(me?.person ?? { firstName: me?.email ?? '?', lastName: '' })} size={30} />
+          <Avatar name={initials(me?.person ?? { firstName: me?.email ?? '?', lastName: '' })} size={30} src={me?.person?.photoUrl} />
           <div className="min-w-0 text-sm">
             <div className="truncate font-semibold">{me?.person ? fullName(me.person) : me?.email}</div>
             <div className="truncate text-ink-faint">{me?.email}</div>
@@ -110,7 +116,7 @@ export function Layout() {
     <div className="min-h-screen lg:grid lg:grid-cols-[248px_1fr]">
       <aside className="sticky top-0 hidden h-screen border-r border-rule bg-sheet lg:block">{nav}</aside>
       <div className="flex items-center justify-between border-b border-rule bg-sheet px-4 py-2 lg:hidden">
-        <span className="font-bold">OpenPers</span>
+        {company.data?.logoUrl ? <img src={company.data.logoUrl} alt={company.data.name} className="h-7 max-w-[10rem] object-contain object-left" /> : <span className="font-bold">{company.data?.name ?? 'OpenPers'}</span>}
         <button type="button" onClick={() => setOpen(true)} aria-label="Menu" className="rounded p-2 hover:bg-rule-soft">
           <Menu size={20} />
         </button>

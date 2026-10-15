@@ -7,14 +7,16 @@ import { api, ApiError } from '../lib/api';
 import { setLanguage } from '../lib/i18n';
 import { Button, Field, Input, Select, Spinner } from '../components/ui';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { BrandMark, useBranding } from '../components/Photo';
 
 export function AuthShell({ title, intro, children }: { title: string; intro?: ReactNode; children: ReactNode }) {
+  const branding = useBranding();
   return (
     <div className="flex min-h-screen items-start justify-center px-4 py-12 sm:items-center">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center gap-2">
-          <img src="/favicon.svg" alt="" className="size-8" />
-          <span className="text-lg font-bold">OpenPers</span>
+          <BrandMark className="h-8" />
+          {!branding?.logoUrl && <span className="text-lg font-bold">{branding?.name ?? 'OpenPers'}</span>}
           <span className="ml-auto">
             <ThemeToggle />
           </span>
