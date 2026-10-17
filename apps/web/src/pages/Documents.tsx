@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { fmtDate } from '../lib/format';
 import { Button, Checkbox, Dialog, Empty, Field, Input, PageHeader, Select, Spinner, Table, useErrorText, useToast } from '../components/ui';
+import { CompanyDocumentsSection } from '../components/CompanyDocs';
 
 const fmtSize = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
@@ -173,7 +174,7 @@ export function DocumentList({ personId }: { personId: string }) {
                 <span className="block text-sm text-ink-faint">{fmtSize(d.size)}</span>
               </td>
               <td>{catName(d.categoryId)}</td>
-              <td className="tnum">{fmtDate(d.documentDate ?? d.createdAt.slice(0, 10))}</td>
+              <td className="tnum">{fmtDate(d.documentDate ?? d.createdAt)}</td>
               <td className="text-sm text-ink-faint">{full && (d.employeeVisible ? t('documents.visible') : t('documents.hidden'))}</td>
               <td className="text-right whitespace-nowrap">
                 <a href={`/api/v1/documents/${d.id}/download`} aria-label={t('documents.download')} className="inline-flex rounded p-1.5 text-ink-soft hover:bg-rule-soft">
@@ -201,7 +202,15 @@ export function MyDocumentsPage() {
   return (
     <div>
       <PageHeader title={t('documents.title')} />
-      {me?.personId && <DocumentList personId={me.personId} />}
+      <div className="grid gap-6">
+        <CompanyDocumentsSection />
+        {me?.personId && (
+          <div>
+            <h2 className="mb-3 text-lg font-bold">{t('documents.personal')}</h2>
+            <DocumentList personId={me.personId} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

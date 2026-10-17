@@ -10,6 +10,7 @@ import { fullName, initials } from '../lib/format';
 import { Avatar, cx } from './ui';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from './Notifications';
+import { useOpenConfirmations } from './CompanyDocs';
 
 export function Layout() {
   const { t, i18n } = useTranslation();
@@ -26,6 +27,7 @@ export function Layout() {
   const openReviews = (reviews.data?.items ?? []).filter((r: any) => r.status === 'pending' && r.cycle.status === 'active').length;
   const surveys = useQuery({ queryKey: ['surveys-open'], queryFn: () => api.get('/surveys/open'), refetchInterval: 300_000 });
   const openSurveys = (surveys.data?.items ?? []).filter((s: any) => !s.answered).length;
+  const openConfirmations = useOpenConfirmations();
 
   const items = [
     { to: '/', label: t('nav.dashboard'), icon: LayoutGrid, show: true, end: true },
@@ -37,7 +39,7 @@ export function Layout() {
     { to: '/time', label: t('nav.time'), icon: Clock, show: can('time.track') || can('time.read') },
     { to: '/performance', label: t('nav.performance'), icon: Target, show: !!me?.personId || can('performance.manage'), badge: openReviews },
     { to: '/surveys', label: t('nav.surveys'), icon: ClipboardList, show: true, badge: openSurveys },
-    { to: '/documents', label: t('nav.documents'), icon: FileText, show: !!me?.personId },
+    { to: '/documents', label: t('nav.documents'), icon: FileText, show: !!me?.personId || can('documents.manage'), badge: openConfirmations },
     { to: '/recruiting', label: t('nav.recruiting'), icon: Briefcase, show: can('recruiting.read') },
     { to: '/analytics', label: t('nav.analytics'), icon: ChartColumn, show: can('analytics.read') },
     { to: '/settings', label: t('nav.settings'), icon: Settings, show: can('settings.manage') || can('org.manage') || can('absence.manage') || can('users.manage') || can('people.write') },

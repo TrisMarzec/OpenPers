@@ -91,6 +91,8 @@ export const companyDocsModule: OpenPersModule = {
         await audit(tx, user.userId, 'company_document', d.id, 'create', { title: d.title, requiresAck: d.requiresAck });
         if (d.requiresAck) {
           const people = [...(await audienceOf(tx, d.orgUnitId))];
+          // Whoever publishes the document has read it.
+          if (user.personId && people.includes(user.personId)) await tx.insert(companyDocumentAcks).values({ documentId: d.id, personId: user.personId });
           const accounts = people.length ? await tx.select({ id: users.id }).from(users).where(and(inArray(users.personId, people), eq(users.active, true))) : [];
           await notify(tx, accounts.map((a) => a.id).filter((id) => id !== user.userId), 'company_document', { title: d.title }, '/documents');
         }

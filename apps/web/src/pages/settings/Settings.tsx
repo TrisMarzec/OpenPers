@@ -37,7 +37,14 @@ function CompanySettings() {
     { key: 'retentionMonths', label: t('settings.retentionMonths'), type: 'number' },
   ];
   return (
-    <Section title={t('settings.sections.company')}>
+    <Section
+      title={t('settings.sections.company')}
+      actions={
+        <Link to="/welcome" className="text-sm font-semibold text-stamp hover:underline">
+          {t('welcome.openWizard')}
+        </Link>
+      }
+    >
       <div className="mb-6 border-b border-rule pb-6">
         <LogoEditor />
       </div>

@@ -324,7 +324,7 @@ export function PersonPage({ selfView = false }: { selfView?: boolean }) {
           {selfView && <p className="text-sm font-semibold text-stamp">{t('nav.profile')}</p>}
           <h1 className="text-2xl font-bold">{fullName(p)}</h1>
           <p className="text-ink-soft">{[emp?.positionTitle, emp?.orgUnits?.map((o: any) => o.name).join(', ')].filter(Boolean).join(' – ') || p.email}</p>
-          {p.anonymizedAt && <p className="text-sm text-refuse">{t('person.anonymized', { date: fmtDate(p.anonymizedAt.slice(0, 10)) })}</p>}
+          {p.anonymizedAt && <p className="text-sm text-refuse">{t('person.anonymized', { date: fmtDate(p.anonymizedAt) })}</p>}
         </div>
         {emp && <Stamp status={emp.status} />}
         <div className="flex flex-wrap gap-2">

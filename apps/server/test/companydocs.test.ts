@@ -38,6 +38,8 @@ describe('company documents with read confirmation', () => {
     expect(handbook.fileKey).toBeUndefined();
     const mine = (await emp.client.get('/api/v1/company-documents')).body.items;
     expect(mine.find((d: any) => d.id === handbook.id)).toMatchObject({ acknowledgedAt: null });
+    // Whoever publishes the document does not have to confirm it again.
+    expect((await hr.client.get('/api/v1/company-documents')).body.items.find((d: any) => d.id === handbook.id).acknowledgedAt).not.toBeNull();
     const notes = (await emp.client.get('/api/v1/notifications')).body.items;
     expect(notes.some((n: any) => n.kind === 'company_document')).toBe(true);
     expect((await upload(emp.client, { title: 'Hack' })).status).toBe(403);
@@ -53,11 +55,12 @@ describe('company documents with read confirmation', () => {
     await emp.client.post(`/api/v1/company-documents/${handbook.id}/acknowledge`);
     expect((await emp.client.get('/api/v1/company-documents')).body.items.find((d: any) => d.id === handbook.id).acknowledgedAt).toBe(first);
     const acks = (await hr.client.get(`/api/v1/company-documents/${handbook.id}/acknowledgements`)).body;
-    expect(acks.acknowledged.map((a: any) => a.person.id)).toEqual([emp.personId]);
-    expect(acks.pending.map((a: any) => a.person.id)).toEqual(expect.arrayContaining([hr.personId, outsider.personId]));
+    expect(acks.acknowledged.map((a: any) => a.person.id).sort()).toEqual([emp.personId, hr.personId].sort());
+    expect(acks.pending.map((a: any) => a.person.id)).toContain(outsider.personId);
+    expect(acks.pending.map((a: any) => a.person.id)).not.toContain(hr.personId);
     expect((await emp.client.get(`/api/v1/company-documents/${handbook.id}/acknowledgements`)).status).toBe(403);
     const list = (await hr.client.get('/api/v1/company-documents')).body.items.find((d: any) => d.id === handbook.id);
-    expect(list.stats).toMatchObject({ acknowledged: 1 });
+    expect(list.stats).toMatchObject({ acknowledged: 2 });
   });
 
   it('limits documents to a department when an audience is set', async () => {

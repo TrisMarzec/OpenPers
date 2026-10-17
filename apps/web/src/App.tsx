@@ -16,6 +16,7 @@ import { TasksPage } from './pages/Tasks';
 import { AnalyticsPage } from './pages/Analytics';
 import { PerformancePage } from './pages/Performance';
 import { SurveyAnswerPage, SurveysPage } from './pages/Surveys';
+import { WelcomePage } from './pages/Welcome';
 import { AbsencesPage } from './pages/Absences';
 import { TimePage } from './pages/Time';
 import { MyDocumentsPage } from './pages/Documents';
@@ -55,6 +56,7 @@ export function App() {
               }
             >
               <Route index element={<DashboardPage />} />
+              <Route path="welcome" element={<WelcomePage />} />
               <Route path="me" element={<PersonPage selfView />} />
               <Route path="people" element={<PeoplePage />} />
               <Route path="people/:id" element={<PersonPage />} />
