@@ -163,3 +163,30 @@ describe('team working times', () => {
     expect(all.body.items.length).toBeGreaterThanOrEqual(5);
   });
 });
+
+describe('base employee role', () => {
+  let app: FastifyInstance;
+  let admin: Client;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    admin = await setupCompany(app);
+  });
+  afterAll(() => app.close());
+
+  it('keeps self-service rights for managers without letting them approve their own leave', async () => {
+    const lead = await createEmployee(app, admin, { firstName: 'Lara', role: 'manager' });
+    await createEmployee(app, admin, { firstName: 'Rico', supervisorPersonId: lead.personId });
+    const roles = (await admin.get('/api/v1/users')).body.items.find((u: any) => u.id === lead.userId).roles.map((r: any) => r.key).sort();
+    expect(roles).toEqual(['employee', 'manager']);
+    expect((await lead.client.get(`/api/v1/persons/${lead.personId}/balances?year=2026`)).status).toBe(200);
+    expect((await lead.client.post('/api/v1/attendance/clock-in')).status).toBe(201);
+    const types = (await lead.client.get('/api/v1/absence-types')).body.items;
+    const req = await lead.client.post('/api/v1/absence-periods', { typeId: types.find((t: any) => t.category === 'vacation').id, startDate: '2026-11-02', endDate: '2026-11-03' });
+    expect(req.status).toBe(201);
+    expect((await lead.client.post(`/api/v1/absence-periods/${req.body.id}/approve`)).status).toBe(403);
+    // Re-assigning only the manager role keeps the base role as well.
+    await admin.patch(`/api/v1/users/${lead.userId}`, { roles: ['manager'] });
+    expect((await admin.get('/api/v1/users')).body.items.find((u: any) => u.id === lead.userId).roles.map((r: any) => r.key).sort()).toEqual(['employee', 'manager']);
+  });
+});

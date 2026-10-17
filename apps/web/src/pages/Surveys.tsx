@@ -320,12 +320,14 @@ function SurveyResults({ id, onBack }: { id: string; onBack: () => void }) {
         <Empty>{t('surveys.suppressed', { min: r.minGroup })}</Empty>
       ) : (
         <>
-          {r.questions.map((x: any) => {
+          {/* Charts side by side on wide screens; a 5-step scale does not need the full width. */}
+          <div className="grid items-start gap-5 lg:grid-cols-2">
+            {r.questions.map((x: any) => {
             if (x.type === 'scale') {
               const labels = ['1', '2', '3', '4', '5'];
               return (
                 <ChartCard key={x.id} title={`${x.text} · ${t('surveys.average', { value: fmtNumber(x.summary.average) })}`} csv={`${slug}-${x.id}.csv`} table={{ head: [x.text, t('surveys.count')], rows: labels.map((l, i) => [l, x.summary.distribution[i]]) }}>
-                  <ColumnChart labels={labels} series={[{ key: x.id, label: t('surveys.count'), color: SERIES, values: x.summary.distribution }]} height={160} />
+                  <ColumnChart labels={labels} series={[{ key: x.id, label: t('surveys.count'), color: SERIES, values: x.summary.distribution }]} width={420} height={200} integer />
                 </ChartCard>
               );
             }
@@ -372,7 +374,8 @@ function SurveyResults({ id, onBack }: { id: string; onBack: () => void }) {
                 )}
               </Section>
             );
-          })}
+            })}
+          </div>
           {numeric.length > 0 && (
             <Section title={t('surveys.heatmap')}>
               <p className="mb-3 text-sm text-ink-soft">{t('surveys.heatmapHint', { min: MIN_GROUP })}</p>

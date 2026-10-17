@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Search } from 'lucide-react';
-import { buildReportingTree, buildUnitTree, countDescendants, type ReportingNode, type UnitNode } from '@openpers/shared';
+import { buildReportingTree, buildUnitTree, largestSpan, type ReportingNode, type UnitNode } from '@openpers/shared';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { fullName, initials } from '../lib/format';
@@ -62,13 +62,16 @@ function PersonCard({ person, linkable, highlight, reports, open, onToggle }: { 
   );
 }
 
+/** From this many reports without own teams, the cards are stacked vertically. */
+const STACK_FROM = 3;
+
 function ReportingBranch({ node, state }: { node: ReportingNode<DirPerson>; state: TreeState }) {
   const open = state.isOpen(node.item.id);
   return (
     <li>
       <PersonCard person={node.item} linkable={state.linkable(node.item.id)} highlight={state.highlight.has(node.item.id)} reports={node.children.length} open={open} onToggle={() => state.toggle(node.item.id)} />
       {open && node.children.length > 0 && (
-        <ul>
+        <ul className={node.children.length >= STACK_FROM && node.children.every((c) => !c.children.length) ? 'stack' : undefined}>
           {node.children.map((c) => (
             <ReportingBranch key={c.item.id} node={c} state={state} />
           ))}
@@ -185,7 +188,7 @@ export function OrgChartPage() {
   };
 
   const unassigned = people.filter((p) => !p.orgUnitIds.length);
-  const largestTeam = tree.reduce((m, n) => Math.max(m, countDescendants(n)), 0);
+  const largestTeam = largestSpan(tree);
 
   return (
     <div>

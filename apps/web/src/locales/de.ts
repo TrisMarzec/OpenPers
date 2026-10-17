@@ -549,7 +549,7 @@ const de = {
     noProject: 'Kein Projekt',
     worked: 'Gearbeitet',
     breaks: 'Pausen',
-    balance: 'Saldo seit Eintritt',
+    balance: 'Gleitzeitsaldo',
     weekTotal: 'Woche gesamt',
     empty: 'Keine Einträge an diesem Tag.',
     saved: 'Zeit gespeichert',

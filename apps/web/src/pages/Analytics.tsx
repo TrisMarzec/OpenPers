@@ -92,7 +92,7 @@ export function AnalyticsPage() {
               csv={`headcount-${from}-${to}.csv`}
               table={{ head: [t('absence.month'), t('analytics.headcount'), t('analytics.fte')], rows: d.months.map((m: any) => [m.month, m.headcount, m.fte]) }}
             >
-              <ColumnChart labels={d.months.map((m: any) => monthLabel(m.month))} series={[{ key: 'hc', label: t('analytics.headcount'), color: series1, values: d.months.map((m: any) => m.headcount) }]} />
+              <ColumnChart labels={d.months.map((m: any) => monthLabel(m.month))} series={[{ key: 'hc', label: t('analytics.headcount'), color: series1, values: d.months.map((m: any) => m.headcount) }]} integer />
             </ChartCard>
             <ChartCard
               title={t('analytics.movementsChart')}
@@ -109,6 +109,7 @@ export function AnalyticsPage() {
                   { key: 'hires', label: t('analytics.hires'), color: series1, values: d.months.map((m: any) => m.hires) },
                   { key: 'exits', label: t('analytics.exits'), color: series2, values: d.months.map((m: any) => m.exits) },
                 ]}
+                integer
               />
             </ChartCard>
           </div>

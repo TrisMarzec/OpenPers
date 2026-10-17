@@ -71,6 +71,13 @@
       "when": 1792099964158,
       "tag": "0009_photos_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792246619452,
+      "tag": "0010_base_employee_role",
+      "breakpoints": true
     }
   ]
 }

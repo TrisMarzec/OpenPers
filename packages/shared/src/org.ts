@@ -67,6 +67,11 @@ export function countDescendants(node: { children: unknown[] }): number {
   return (node.children as { children: unknown[] }[]).reduce((s, c) => s + 1 + countDescendants(c), 0);
 }
 
+/** Largest number of direct reports of any person (span of control), e.g. for "largest team". */
+export function largestSpan(nodes: { children: unknown[] }[]): number {
+  return nodes.reduce((m, n) => Math.max(m, n.children.length, largestSpan(n.children as { children: unknown[] }[])), 0);
+}
+
 /** Org-unit forest with each person attached to the units of their employment. */
 export function buildUnitTree<U extends OrgUnitLike, P extends OrgPerson>(units: U[], people: P[]): UnitNode<U, P>[] {
   const nodes = new Map(units.map((u) => [u.id, { unit: u, members: people.filter((p) => p.orgUnitIds?.includes(u.id)), children: [] as UnitNode<U, P>[] }]));

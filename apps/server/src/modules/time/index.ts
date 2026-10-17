@@ -113,11 +113,21 @@ export const timeModule: OpenPersModule = {
     }
 
     /** One row per day of the month with target, actual, difference and context. */
+    /**
+     * Time tracking starts with the first recorded workday: earlier days were never tracked and
+     * must not show up as missing hours (neither in the balance nor in the month list).
+     */
+    async function trackingStartOf(personId: string): Promise<string | null> {
+      const [first] = await db.select({ date: attendancePeriods.date }).from(attendancePeriods).where(and(eq(attendancePeriods.personId, personId), eq(attendancePeriods.type, 'WORK'), ne(attendancePeriods.status, 'rejected'))).orderBy(asc(attendancePeriods.date)).limit(1);
+      return first?.date ?? null;
+    }
+
     async function monthData(personId: string, month: string) {
     const from = `${month}-01`;
     const to = addDays(`${addDays(from, 31).slice(0, 7)}-01`, -1);
     const region = (await regionOf(db, personId, from)) as Region;
-    const [schedules, customHolidays, absences, periods] = await Promise.all([
+    const [trackingSince, schedules, customHolidays, absences, periods] = await Promise.all([
+      trackingStartOf(personId),
       schedulesOf(db, personId),
       customHolidaysFor(db, region, from, to),
       absencesByDay(personId, from, to),
@@ -135,6 +145,7 @@ export const timeModule: OpenPersModule = {
       const wd = weekdayIndex(date);
       const prev = rows.filter((r) => r.type === 'WORK' && r.date === addDays(date, -1) && r.endAt).map((r) => r.endAt!).sort().pop();
       const closed = work.filter((r) => r.endAt);
+      const tracked = !!trackingSince && date >= trackingSince;
       days.push({
         date,
         weekend: wd >= 5,
@@ -145,7 +156,8 @@ export const timeModule: OpenPersModule = {
         end: work.length && work[work.length - 1].endAt ? work[work.length - 1].endAt!.slice(11, 16) : null,
         breakMinutes,
         workedMinutes,
-        diffMinutes: workedMinutes - targetMinutes,
+        tracked,
+        diffMinutes: tracked ? workedMinutes - targetMinutes : 0,
         location: work.find((r) => r.location)?.location ?? null,
         projectId: work.find((r) => r.projectId)?.projectId ?? null,
         comment: work.find((r) => r.comment)?.comment ?? null,
@@ -161,18 +173,15 @@ export const timeModule: OpenPersModule = {
       (t, d) => ({ targetMinutes: t.targetMinutes + d.targetMinutes, workedMinutes: t.workedMinutes + d.workedMinutes, diffMinutes: t.diffMinutes + (d.date < today || d.workedMinutes > 0 ? d.diffMinutes : 0) }),
       { targetMinutes: 0, workedMinutes: 0, diffMinutes: 0 },
     );
-    return { month, days, totals };
+    return { month, trackingSince, days, totals };
     }
 
-    /** Overtime balance: target vs. worked from employment start (or qFrom) until yesterday (or qTo). */
+    /** Overtime balance: target vs. worked from the start of tracking (or qFrom) until yesterday (or qTo). */
     async function balanceOf(personId: string, qFrom?: string, qTo?: string) {
     // By default the balance runs until yesterday: the current day is not finished yet.
     const to = qTo ?? addDays(new Date().toISOString().slice(0, 10), -1);
     const emp = await currentEmployment(db, personId, to);
-    // Time tracking starts with the first recorded workday: earlier months were never tracked and
-    // must not show up as missing hours.
-    const [first] = await db.select({ date: attendancePeriods.date }).from(attendancePeriods).where(and(eq(attendancePeriods.personId, personId), eq(attendancePeriods.type, 'WORK'), ne(attendancePeriods.status, 'rejected'))).orderBy(asc(attendancePeriods.date)).limit(1);
-    const trackingSince = first?.date ?? null;
+    const trackingSince = await trackingStartOf(personId);
     const defaultFrom = trackingSince ? [emp?.startDate, trackingSince].filter(Boolean).sort().at(-1)! : addDays(to, 1);
     const from = qFrom ?? defaultFrom;
     if (qFrom && qTo && from > to) throw unprocessable('Invalid range', [{ path: 'from', message: 'from must not be after to' }]);

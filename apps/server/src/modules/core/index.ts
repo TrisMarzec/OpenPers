@@ -29,8 +29,16 @@ function recordFailure(email: string) {
   else entry.count++;
 }
 
+/** Built-in role every account linked to a person keeps: own absences, own times, own documents. */
+export const BASE_ROLE = 'employee';
+
 export async function assignRoles(tx: Exec, userId: string, refs: z.infer<typeof roleRef>[]) {
   await tx.delete(roleAssignments).where(eq(roleAssignments.userId, userId));
+  // Managers are employees too: scopes like `reports` exclude oneself on purpose (no approving your
+  // own leave), so self-service comes from the base role, added on top like in Personio.
+  const [u] = await tx.select({ personId: users.personId }).from(users).where(eq(users.id, userId));
+  const keys = refs.map((r) => (typeof r === 'string' ? r : r.key));
+  if (u?.personId && !keys.includes(BASE_ROLE)) refs = [...refs, BASE_ROLE];
   for (const ref of refs) {
     const key = typeof ref === 'string' ? ref : ref.key;
     const [role] = await tx.select().from(roles).where(eq(roles.key, key));

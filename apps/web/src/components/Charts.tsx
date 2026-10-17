@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Table as TableIcon } from 'lucide-react';
+import { fmtNumber } from '../lib/format';
 import { Button, Section, Table } from './ui';
 
 export interface Series {
@@ -70,21 +71,22 @@ export function ChartCard({ title, children, table, csv, legend }: { title: Reac
   );
 }
 
-const niceMax = (v: number) => {
-  if (v <= 0) return 1;
+/** Rounded axis maximum; counts get an even whole number so the middle tick stays whole too. */
+const niceMax = (v: number, integer: boolean) => {
+  if (v <= 0) return integer ? 2 : 1;
   const p = 10 ** Math.floor(Math.log10(v));
-  return [1, 2, 2.5, 5, 10].map((m) => m * p).find((m) => m >= v)!;
+  const steps = integer && p === 1 ? [2, 4, 6, 8, 10] : [1, 2, 2.5, 5, 10];
+  return steps.map((m) => m * p).find((m) => m >= v)!;
 };
 
 /**
  * Column chart over categories (e.g. months). One or two series side by side, thin columns
  * with rounded data ends, a 2px gap between neighbours, a recessive grid and a hover tooltip.
  */
-export function ColumnChart({ labels, series, format = (v) => String(v), height = 200 }: { labels: string[]; series: Series[]; format?: (v: number) => string; height?: number }) {
+export function ColumnChart({ labels, series, format = fmtNumber, height = 200, integer = false, width = 640 }: { labels: string[]; series: Series[]; format?: (v: number) => string; height?: number; integer?: boolean; /** viewBox width: smaller keeps labels readable in narrow cards */ width?: number }) {
   const [hover, setHover] = useState<number | null>(null);
-  const width = 640;
   const pad = { top: 12, right: 8, bottom: 26, left: 36 };
-  const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values)));
+  const max = niceMax(Math.max(0, ...series.flatMap((s) => s.values)), integer);
   const innerW = width - pad.left - pad.right;
   const innerH = height - pad.top - pad.bottom;
   const band = innerW / Math.max(1, labels.length);
@@ -143,12 +145,12 @@ export function ColumnChart({ labels, series, format = (v) => String(v), height 
 }
 
 /** Horizontal bars for a ranked breakdown (single series, values labelled). */
-export function BarList({ items, format = (v) => String(v), color = 'var(--color-series-1)' }: { items: { label: string; value: number }[]; format?: (v: number) => string; color?: string }) {
+export function BarList({ items, format = fmtNumber, color = 'var(--color-series-1)' }: { items: { label: string; value: number }[]; format?: (v: number) => string; color?: string }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
     <ul className="grid gap-2">
       {items.map((i) => (
-        <li key={i.label} className="grid grid-cols-[minmax(7rem,30%)_1fr_auto] items-center gap-3 text-sm" title={`${i.label}: ${format(i.value)}`}>
+        <li key={i.label} className="grid grid-cols-[minmax(7rem,40%)_1fr_auto] items-center gap-3 text-sm" title={`${i.label}: ${format(i.value)}`}>
           <span className="truncate">{i.label}</span>
           <span className="h-3 rounded-r-[4px]" style={{ width: `${Math.max(2, (i.value / max) * 100)}%`, background: color }} />
           <span className="tnum font-semibold">{format(i.value)}</span>

@@ -551,7 +551,7 @@ const en: Dict = {
     noProject: 'No project',
     worked: 'Worked',
     breaks: 'Breaks',
-    balance: 'Balance since start',
+    balance: 'Flextime balance',
     weekTotal: 'Week total',
     empty: 'No entries on this day.',
     saved: 'Time saved',

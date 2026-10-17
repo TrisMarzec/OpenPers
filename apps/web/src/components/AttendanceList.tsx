@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronLeft, ChevronRight, Copy, Eraser, TriangleAlert } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
-import { fmtMinutes, parseISO, toISO, todayISO } from '../lib/format';
+import { fmtDate, fmtMinutes, parseISO, toISO, todayISO } from '../lib/format';
 import { Button, cx, Swatch, useErrorText, useToast } from './ui';
 
 export interface MonthDay {
@@ -17,6 +17,8 @@ export interface MonthDay {
   breakMinutes: number;
   workedMinutes: number;
   diffMinutes: number;
+  /** False before the first tracked day: missing hours are not counted there. */
+  tracked: boolean;
   location: string | null;
   projectId: string | null;
   status: 'pending' | 'approved' | null;
@@ -193,7 +195,7 @@ function Row({ day, previous, editable, personId, projects, month }: { day: Mont
         <input aria-label={t('time.breaks')} type="number" inputMode="numeric" min={0} max={720} step={5} className={cx(cell, 'tnum w-16 text-right placeholder:text-rule')} disabled={disabled} value={draft.breakMinutes} placeholder="–" onChange={(e) => setDraft({ ...draft, breakMinutes: e.target.value })} />
       </td>
       <td className="tnum py-1 text-right font-semibold">{worked ? fmtMinutes(worked) : day.running ? <span className="text-grant">{t('time.running')}</span> : ''}</td>
-      <td className={cx('tnum py-1 pr-3 text-right', worked || day.targetMinutes ? (diff < 0 ? 'text-refuse' : diff > 0 ? 'text-grant' : 'text-ink-soft') : '')}>{worked || (day.targetMinutes && day.date < todayISO()) ? fmtMinutes(diff, true) : ''}</td>
+      <td className={cx('tnum py-1 pr-3 text-right', worked || day.targetMinutes ? (diff < 0 ? 'text-refuse' : diff > 0 ? 'text-grant' : 'text-ink-soft') : '')}>{worked || (day.tracked && day.targetMinutes && day.date < todayISO()) ? fmtMinutes(diff, true) : ''}</td>
       <td className="py-1">
         <select aria-label={t('time.location')} className={cx(cell, 'w-28 text-sm')} disabled={disabled} value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })}>
           <option value="">–</option>
@@ -311,6 +313,7 @@ export function AttendanceList({ personId, editable }: { personId: string; edita
               <div>
                 <dt className="inline text-ink-soft">{t('time.balance')}: </dt>
                 <dd className={cx('inline font-bold', balance.data.balanceMinutes < 0 ? 'text-refuse' : 'text-grant')}>{fmtMinutes(balance.data.balanceMinutes, true)}</dd>
+                {balance.data.trackingSince && <dd className="ml-1 inline text-xs text-ink-faint">({t('time.balanceSince', { date: fmtDate(balance.data.trackingSince) })})</dd>}
               </div>
             )}
           </dl>

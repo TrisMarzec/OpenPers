@@ -90,6 +90,17 @@ describe('time tracking', () => {
     expect(bal.body).toMatchObject({ from: '2026-06-15', trackingSince: '2026-06-15', targetMinutes: 480, workedMinutes: 510, balanceMinutes: 30 });
   });
 
+  it('does not count days before the first tracked day as missing in the month view', async () => {
+    const emp = await newEmployee('Mona', '2025-01-01');
+    await emp.client.post('/api/v1/attendance', entry('2026-06-17', '08:00', '16:00'));
+    const month = (await emp.client.get('/api/v1/attendance/month?month=2026-06')).body;
+    expect(month.trackingSince).toBe('2026-06-17');
+    const before = month.days.find((d: any) => d.date === '2026-06-16');
+    expect(before).toMatchObject({ targetMinutes: 480, tracked: false, diffMinutes: 0 });
+    expect(month.days.find((d: any) => d.date === '2026-06-17')).toMatchObject({ tracked: true, workedMinutes: 480, diffMinutes: 0 });
+    expect(month.days.find((d: any) => d.date === '2026-06-18')).toMatchObject({ tracked: true, diffMinutes: -480 });
+  });
+
   it('requires approval when configured and lets managers approve', async () => {
     expect((await admin.patch('/api/v1/time-settings', { approvalRequired: true })).status).toBe(200);
     const emp = await newEmployee('Paul');

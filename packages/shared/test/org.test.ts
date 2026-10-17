@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReportingTree, buildUnitTree, countDescendants } from '../src/org';
+import { buildReportingTree, buildUnitTree, countDescendants, largestSpan } from '../src/org';
 
 const p = (id: string, supervisorPersonId: string | null = null, orgUnitIds: string[] = []) => ({ id, supervisorPersonId, orgUnitIds });
 
@@ -10,6 +10,12 @@ describe('buildReportingTree', () => {
     expect(tree[0].children.map((n) => n.item.id)).toEqual(['cto', 'cfo']);
     expect(tree[0].children[0].children.map((n) => n.item.id)).toEqual(['dev1', 'dev2']);
     expect(countDescendants(tree[0])).toBe(4);
+  });
+
+  it('reports the largest number of direct reports anywhere in the forest', () => {
+    const tree = buildReportingTree([p('ceo'), p('cto', 'ceo'), p('d1', 'cto'), p('d2', 'cto'), p('d3', 'cto'), p('solo')]);
+    expect(largestSpan(tree)).toBe(3);
+    expect(largestSpan([])).toBe(0);
   });
 
   it('treats people whose supervisor is unknown as roots', () => {
