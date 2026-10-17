@@ -8,8 +8,9 @@ import * as recruiting from '../modules/recruiting/schema';
 import * as workflow from '../modules/workflow/schema';
 import * as performance from '../modules/performance/schema';
 import * as surveys from '../modules/surveys/schema';
+import * as companydocs from '../modules/companydocs/schema';
 
-export const schema = { ...core, ...org, ...people, ...absence, ...time, ...docs, ...recruiting, ...workflow, ...performance, ...surveys };
+export const schema = { ...core, ...org, ...people, ...absence, ...time, ...docs, ...recruiting, ...workflow, ...performance, ...surveys, ...companydocs };
 export * from '../modules/core/schema';
 export * from '../modules/org/schema';
 export * from '../modules/people/schema';
@@ -20,3 +21,4 @@ export * from '../modules/recruiting/schema';
 export * from '../modules/workflow/schema';
 export * from '../modules/performance/schema';
 export * from '../modules/surveys/schema';
+export * from '../modules/companydocs/schema';

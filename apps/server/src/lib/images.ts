@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Exec } from '../db';
-import { applications, company, documents, persons } from '../db/schema';
+import { applications, company, companyDocuments, documents, persons } from '../db/schema';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { HttpError, unprocessable } from './errors';
 import type { StorageAdapter } from './storage';
@@ -45,7 +45,7 @@ export async function sendImage(reply: FastifyReply, storage: StorageAdapter, ke
 
 /**
  * Storage is content-addressed, so the same bytes may back several records. Removes the file
- * only when no person photo, company logo, document or CV still points to it.
+ * only when no person photo, company logo, document, company document or CV still points to it.
  */
 export async function releaseFile(db: Exec, storage: StorageAdapter, key: string | null | undefined) {
   if (!key) return;
@@ -54,6 +54,7 @@ export async function releaseFile(db: Exec, storage: StorageAdapter, key: string
     db.select({ id: company.id }).from(company).where(eq(company.logoKey, key)).limit(1),
     db.select({ id: documents.id }).from(documents).where(eq(documents.fileKey, key)).limit(1),
     db.select({ id: applications.id }).from(applications).where(eq(applications.cvFileKey, key)).limit(1),
+    db.select({ id: companyDocuments.id }).from(companyDocuments).where(eq(companyDocuments.fileKey, key)).limit(1),
   ]);
   if (refs.every((r) => !r.length)) await storage.delete(key);
 }
