@@ -350,7 +350,7 @@ export function FeedbackSection({ personId }: { personId: string }) {
             <li key={f.id} className="border-l-2 border-rule pl-3">
               <div className="flex items-center gap-2 text-xs text-ink-faint">
                 {f.kind === 'praise' ? <Heart size={13} className="text-refuse" aria-hidden /> : <MessageSquare size={13} aria-hidden />}
-                {t(`performance.feedbackLabels.${f.kind}`)} · {f.author ? fullName(f.author) : '–'} · {fmtDate(f.createdAt.slice(0, 10))}
+                {t(`performance.feedbackLabels.${f.kind}`)} · {f.author ? fullName(f.author) : '–'} · {fmtDate(f.createdAt)}
               </div>
               <p className="whitespace-pre-wrap">{f.text}</p>
             </li>

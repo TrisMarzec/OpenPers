@@ -11,6 +11,7 @@ import { ApprovalList } from './Absences';
 import { Avatar, Button, Section, Stamp, Swatch } from '../components/ui';
 import { BalanceFigure } from '../components/PunchCard';
 import { PersonAvatar } from '../components/Photo';
+import { SetupGuideCard } from './Welcome';
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -38,6 +39,8 @@ export function DashboardPage() {
           </Button>
         )}
       </div>
+
+      {can('settings.manage') && <SetupGuideCard />}
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div className="grid content-start gap-5">

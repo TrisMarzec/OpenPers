@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../lib/api';
@@ -48,6 +48,9 @@ export function LoginPage() {
         <Button type="submit" variant="primary" busy={busy}>
           {t('login.submit')}
         </Button>
+        <Link to="/forgot-password" className="justify-self-start text-sm font-semibold text-stamp hover:underline">
+          {t('invite.forgotLink')}
+        </Link>
       </form>
     </AuthShell>
   );

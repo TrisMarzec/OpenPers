@@ -9,6 +9,7 @@ import { fmtDate, fullName, initials, todayISO } from '../lib/format';
 import { AbsenceDialog } from '../components/AbsenceDialog';
 import { PersonPerformance } from '../components/Performance';
 import { PhotoEditor } from '../components/Photo';
+import { InvitationBadge, InviteLinkBox, useMailStatus } from '../components/Invite';
 import { Avatar, Button, Checkbox, Dialog, Field, Input, Section, Select, Spinner, Stamp, Table, Tabs, Textarea, useErrorText, useToast } from '../components/ui';
 import { AbsenceList, BalanceTable } from './Absences';
 import { DocumentList } from './Documents';
@@ -208,19 +209,34 @@ function AccountTab({ person }: { person: any }) {
   const qc = useQueryClient();
   const toast = useToast();
   const errText = useErrorText();
+  const mail = useMailStatus();
   const roles = useQuery({ queryKey: ['roles'], queryFn: () => api.get('/roles') });
   const users = useQuery({ queryKey: ['users'], queryFn: () => api.get('/users') });
   const account = users.data?.items.find((u: any) => u.personId === person.id);
-  const [f, setF] = useState({ password: '', role: 'employee' });
+  // Assigned roles always include the base employee role; the select shows the "highest" one.
+  const mainRole = (account?.roles ?? []).map((r: any) => r.key).find((k: string) => k !== 'employee') ?? 'employee';
+  const [f, setF] = useState({ password: '', role: 'employee', mode: 'invite' as 'invite' | 'password' });
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (account?.roles?.[0]) setF((x) => ({ ...x, role: account.roles[0].key }));
+    if (account) setF((x) => ({ ...x, role: mainRole }));
   }, [account?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const refresh = () => ['users', 'setup-guide'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
   const create = useMutation({
-    mutationFn: () => api.post('/users', { email: person.email, password: f.password, roles: [f.role], personId: person.id, locale: person.language === 'en' ? 'en' : 'de' }),
-    onSuccess: () => {
-      toast(t('common.created'));
-      qc.invalidateQueries({ queryKey: ['users'] });
-      qc.invalidateQueries({ queryKey: ['person', person.id] });
+    mutationFn: () =>
+      api.post('/users', { email: person.email, roles: [f.role], personId: person.id, locale: person.language === 'en' ? 'en' : 'de', ...(f.mode === 'invite' ? { invite: true } : { password: f.password }) }),
+    onSuccess: (u: any) => {
+      toast(f.mode === 'invite' ? (u.inviteUrl ? t('invite.created') : t('invite.sent', { email: person.email })) : t('common.created'));
+      setInviteUrl(u.inviteUrl ?? null);
+      refresh();
+    },
+    onError: (e) => toast(errText(e), 'error'),
+  });
+  const resend = useMutation({
+    mutationFn: () => api.post(`/users/${account.id}/invite`),
+    onSuccess: (r: any) => {
+      toast(r.inviteUrl ? t('invite.created') : t('invite.sent', { email: account.email }));
+      setInviteUrl(r.inviteUrl ?? null);
+      refresh();
     },
     onError: (e) => toast(errText(e), 'error'),
   });
@@ -228,7 +244,8 @@ function AccountTab({ person }: { person: any }) {
     mutationFn: (body: any) => api.patch(`/users/${account.id}`, body),
     onSuccess: () => {
       toast(t('common.saved'));
-      qc.invalidateQueries({ queryKey: ['users'] });
+      setF((x) => ({ ...x, password: '' }));
+      refresh();
     },
     onError: (e) => toast(errText(e), 'error'),
   });
@@ -242,32 +259,66 @@ function AccountTab({ person }: { person: any }) {
     </Select>
   );
   if (users.isLoading) return <Spinner />;
+  const invitationOpen = account?.invitation && account.invitation.status !== 'accepted';
   return (
     <Section title={t('person.tabs.account')}>
       {!account ? (
         <div className="grid max-w-md gap-4">
           <p className="text-ink-soft">{t('person.noAccount')}</p>
           <Field label={t('person.role')}>{roleSelect}</Field>
-          <Field label={t('person.initialPassword')} hint={t('setup.passwordHint')}>
-            <Input type="text" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="off" />
-          </Field>
+          <fieldset className="grid gap-2">
+            <legend className="mb-1 text-sm font-semibold">{t('invite.how')}</legend>
+            <label className="flex items-start gap-2">
+              <input type="radio" name="account-mode" className="mt-1 accent-stamp" checked={f.mode === 'invite'} onChange={() => setF({ ...f, mode: 'invite' })} />
+              <span>
+                {t('invite.byMail', { email: person.email })}
+                <span className="block text-sm text-ink-faint">{mail && !mail.configured ? t('invite.byMailNoServer') : t('invite.byMailHint')}</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="radio" name="account-mode" className="mt-1 accent-stamp" checked={f.mode === 'password'} onChange={() => setF({ ...f, mode: 'password' })} />
+              <span>
+                {t('invite.byPassword')}
+                <span className="block text-sm text-ink-faint">{t('invite.byPasswordHint')}</span>
+              </span>
+            </label>
+          </fieldset>
+          {f.mode === 'password' && (
+            <Field label={t('person.initialPassword')} hint={t('setup.passwordHint')}>
+              <Input type="text" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="off" />
+            </Field>
+          )}
           <div>
-            <Button variant="primary" busy={create.isPending} onClick={() => create.mutate()}>
-              {t('person.createAccount')}
+            <Button variant="primary" busy={create.isPending} disabled={f.mode === 'password' && f.password.length < 10} onClick={() => create.mutate()}>
+              {f.mode === 'invite' ? t('invite.send') : t('person.createAccount')}
             </Button>
           </div>
         </div>
       ) : (
         <div className="grid max-w-md gap-4">
-          <p>
-            <strong>{account.email}</strong>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <strong>{account.email}</strong>
+              <InvitationBadge invitation={account.invitation} />
+            </div>
             {account.lastLoginAt && <span className="block text-sm text-ink-faint">Login: {new Date(account.lastLoginAt).toLocaleString()}</span>}
-          </p>
+            {invitationOpen && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+                {t(account.invitation.status === 'expired' ? 'invite.expiredHint' : 'invite.pendingHint', { date: fmtDate(account.invitation.sentAt) })}
+                <Button size="sm" busy={resend.isPending} onClick={() => resend.mutate()}>
+                  {t('invite.resend')}
+                </Button>
+              </div>
+            )}
+          </div>
+          {inviteUrl && <InviteLinkBox url={inviteUrl} />}
           <Field label={t('person.role')}>{roleSelect}</Field>
           <Checkbox label={t('person.accountActive')} checked={account.active} onChange={(active) => update.mutate({ active })} />
-          <Field label={t('person.initialPassword')} hint={t('setup.passwordHint')}>
-            <Input type="text" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="off" />
-          </Field>
+          {!invitationOpen && (
+            <Field label={t('invite.newPassword')} hint={t('invite.newPasswordHint')}>
+              <Input type="text" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} autoComplete="off" />
+            </Field>
+          )}
           <div>
             <Button variant="primary" busy={update.isPending} onClick={() => update.mutate({ roles: [f.role], ...(f.password ? { password: f.password } : {}) })}>
               {t('common.save')}
@@ -275,6 +326,7 @@ function AccountTab({ person }: { person: any }) {
           </div>
         </div>
       )}
+      {!account && inviteUrl && <InviteLinkBox url={inviteUrl} />}
     </Section>
   );
 }
@@ -324,7 +376,7 @@ export function PersonPage({ selfView = false }: { selfView?: boolean }) {
           {selfView && <p className="text-sm font-semibold text-stamp">{t('nav.profile')}</p>}
           <h1 className="text-2xl font-bold">{fullName(p)}</h1>
           <p className="text-ink-soft">{[emp?.positionTitle, emp?.orgUnits?.map((o: any) => o.name).join(', ')].filter(Boolean).join(' – ') || p.email}</p>
-          {p.anonymizedAt && <p className="text-sm text-refuse">{t('person.anonymized', { date: fmtDate(p.anonymizedAt.slice(0, 10)) })}</p>}
+          {p.anonymizedAt && <p className="text-sm text-refuse">{t('person.anonymized', { date: fmtDate(p.anonymizedAt) })}</p>}
         </div>
         {emp && <Stamp status={emp.status} />}
         <div className="flex flex-wrap gap-2">

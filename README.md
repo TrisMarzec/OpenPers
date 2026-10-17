@@ -37,13 +37,14 @@ performance reviews and employee surveys – in one application under your own c
 | **Access to sensitive data** | Roles with scopes (everyone / department / team / self) and a per-role access matrix over 7 data categories (basic data, contact, personal, employment, compensation, bank & tax, performance); confidential fields encrypted with AES-256-GCM |
 | **Absences** | Absence types, vacation policies with carry-over and expiry, pro-rata entitlement (BUrlG §5), public holidays of all 16 German states plus AT/CH, half days, approvals, team calendar |
 | **Time tracking** | Clock in/out, month list with inline editing, breaks, projects, German Working Hours Act checks (breaks, 10 h, rest), flextime balance, team overview, approval and locking |
-| **Documents** | Per-person documents with categories and employee visibility, file signature checks, templates with placeholders |
+| **Documents** | Per-person documents with categories and employee visibility, file signature checks, templates with placeholders; company documents (handbook, privacy notice, policies) for everyone or one department, with read confirmation and an overview of who is missing |
 | **Recruiting** | Jobs, pipeline, public careers page with your logo, applications with CV upload, ratings, "hire" creates the employee, automatic anonymization after the retention period |
 | **On-/offboarding** | Checklist templates with due dates relative to start/exit, assignment to HR/manager/employee, task inbox, notifications |
 | **Performance** | Review cycles with self, manager and anonymous peer reviews (shown in aggregate from 2 peers), release to the employee, goals with progress, praise and confidential feedback |
 | **Surveys** | Anonymous surveys (answers stored without user or time), templates (engagement pulse, eNPS, onboarding), results only from 3 answers, eNPS, department heatmap, reminders |
 | **Analytics** | Headcount, hires and exits, turnover, tenure, absence rates – with table view, CSV export and small-group suppression |
-| **Platform** | Dark and light mode, German & English UI, company logo, audit log, GDPR export & anonymization, REST API with OpenAPI, API tokens, signed webhooks |
+| **Guided setup** | After registration a six-step guide sets up company, locations, departments & teams, access to sensitive data, company documents and the first employees – resumable, with progress on the dashboard |
+| **Platform** | Invitations by e-mail (SMTP) with self-chosen passwords, password reset, dark and light mode, German & English UI, company logo, audit log, GDPR export & anonymization, REST API with OpenAPI, API tokens, signed webhooks |
 
 ## Quick start (Docker)
 

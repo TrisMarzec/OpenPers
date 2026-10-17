@@ -90,6 +90,7 @@ export async function runMaintenance(ctx: AppContext, log?: { error: (o: unknown
 export async function runWorkerOnce(ctx: AppContext): Promise<void> {
   await dispatchOutbox(ctx.db);
   await deliverDue(ctx.db);
+  await ctx.mailer.flush();
 }
 
 export function startWorker(ctx: AppContext, log: { error: (o: unknown, msg?: string) => void }): () => void {
@@ -100,7 +101,7 @@ export function startWorker(ctx: AppContext, log: { error: (o: unknown, msg?: st
     try {
       await runWorkerOnce(ctx);
     } catch (err) {
-      log.error(err, 'webhook worker failed');
+      log.error(err, 'background worker failed');
     } finally {
       running = false;
     }

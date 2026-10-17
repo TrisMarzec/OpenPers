@@ -11,6 +11,7 @@ import { createPersonWithEmployment } from '../people/service';
 import { logoUrl, photoUrl, readImageUpload, releaseFile, sendImage } from '../../lib/images';
 import { loadPrincipal, resolveFieldAccess, SESSION_COOKIE, SESSION_DAYS } from './principal';
 import { registerWebhookRoutes } from './webhooks';
+import { invitationOf, issueInvite, registerInvitationRoutes, startSession } from './invitations';
 import type { Principal } from '../../lib/authz';
 
 const regionSchema = z.enum(REGIONS as [string, ...string[]]);
@@ -56,7 +57,7 @@ async function userView(db: Exec, id: string) {
     .from(roleAssignments)
     .innerJoin(roles, eq(roles.id, roleAssignments.roleId))
     .where(eq(roleAssignments.userId, id));
-  return { id: u.id, email: u.email, personId: u.personId, locale: u.locale, active: u.active, lastLoginAt: u.lastLoginAt, roles: assigned, createdAt: u.createdAt };
+  return { id: u.id, email: u.email, personId: u.personId, locale: u.locale, active: u.active, lastLoginAt: u.lastLoginAt, roles: assigned, createdAt: u.createdAt, invitation: await invitationOf(db, u.id) };
 }
 
 /** Company settings without storage internals, with the public logo URL. */
@@ -71,6 +72,7 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
       const { db, storage } = ctx;
       const route = makeRoute(app, ctx.registry);
       registerWebhookRoutes(app, ctx);
+      registerInvitationRoutes(app, ctx);
 
       // ---------- Setup ----------
       route({ method: 'GET', url: '/api/v1/setup/status', auth: false, tag: 'setup', summary: 'Whether initial setup is required' }, async () => {
@@ -128,11 +130,7 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
             throw unauthorized('Invalid email or password');
           }
           failedLogins.delete(body.email);
-          const token = randomToken();
-          const expiresAt = new Date(Date.now() + SESSION_DAYS * 86_400_000);
-          await db.insert(sessions).values({ tokenHash: sha256(token), userId: user.id, expiresAt });
-          await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
-          reply.setCookie(SESSION_COOKIE, token, { path: '/', httpOnly: true, sameSite: 'lax', secure: ctx.config.secureCookies, expires: expiresAt });
+          await startSession(db, reply, user.id, ctx.config.secureCookies);
           const principal = await loadPrincipal(db, user.id);
           return meView(principal!);
         },
@@ -186,11 +184,13 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
           summary: 'Create a user account',
           body: z.object({
             email: z.string().trim().toLowerCase().email(),
-            password,
+            password: password.optional(),
+            /** Send an invitation e-mail; the person chooses the password. */
+            invite: z.boolean().default(false),
             roles: z.array(roleRef).min(1),
             personId: z.string().uuid().nullish(),
             locale: z.enum(['de', 'en']).default('de'),
-          }),
+          }).refine((b) => b.invite || b.password, { path: ['password'], message: 'Set a password or send an invitation' }),
         },
         async ({ user, body }, reply) => {
           const id = await db.transaction(async (tx) => {
@@ -200,13 +200,16 @@ export function coreModule(modules: OpenPersModule[]): OpenPersModule {
               const [linked] = await tx.select({ id: users.id }).from(users).where(eq(users.personId, body.personId));
               if (linked) throw conflict('This person already has a user account');
             }
-            const [created] = await tx.insert(users).values({ email: body.email, passwordHash: await hashPassword(body.password), personId: body.personId ?? null, locale: body.locale }).returning();
+            const [created] = await tx.insert(users).values({ email: body.email, passwordHash: body.password && !body.invite ? await hashPassword(body.password) : null, personId: body.personId ?? null, locale: body.locale }).returning();
             await assignRoles(tx, created.id, body.roles);
-            await audit(tx, user.userId, 'user', created.id, 'create', { email: body.email, roles: body.roles });
-            return created.id;
+            await audit(tx, user.userId, 'user', created.id, 'create', { email: body.email, roles: body.roles, invite: body.invite });
+            const inviteUrl = body.invite ? await issueInvite(tx, ctx, created.id, user.userId) : null;
+            return { id: created.id, inviteUrl };
           });
+          if (id.inviteUrl) ctx.mailer.kick();
           reply.code(201);
-          return userView(db, id);
+          // Without a mail server the admin passes the link on; otherwise it only travels by e-mail.
+          return { ...(await userView(db, id.id)), ...(id.inviteUrl && ctx.mailer.transport.kind === 'log' ? { inviteUrl: id.inviteUrl } : {}) };
         },
       );
 

@@ -55,7 +55,7 @@ export function SetupPage() {
       await api.post('/auth/login', { email: form.email, password: form.password });
       setLanguage(locale);
       await qc.invalidateQueries();
-      navigate('/');
+      navigate('/welcome');
     } catch (err) {
       setError(err as ApiError);
     } finally {

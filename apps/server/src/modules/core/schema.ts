@@ -129,3 +129,42 @@ export const webhookDeliveries = pgTable(
   },
   (t) => [index('webhook_deliveries_due_idx').on(t.status, t.nextAttemptAt)],
 );
+
+/** One-time links for invitations and password resets; only the SHA-256 of the token is stored. */
+export const userTokens = pgTable(
+  'user_tokens',
+  {
+    id: id(),
+    userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    /** invite | reset */
+    kind: text('kind').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdByUserId: uuid('created_by_user_id'),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex('user_tokens_hash_idx').on(t.tokenHash), index('user_tokens_user_idx').on(t.userId)],
+);
+
+/** Outgoing mail queue, sent by the background worker with retries. */
+export const emails = pgTable(
+  'emails',
+  {
+    id: id(),
+    to: text('to').notNull(),
+    subject: text('subject').notNull(),
+    text: text('text').notNull(),
+    html: text('html').notNull(),
+    /** invite | reset | test | … – for the log */
+    kind: text('kind').notNull(),
+    /** pending | sent | failed | skipped (no mail server configured) */
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastError: text('last_error'),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('emails_due_idx').on(t.status, t.nextAttemptAt)],
+);

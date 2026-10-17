@@ -10,9 +10,13 @@ export const todayISO = () => {
 export const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 export const parseISO = (s: string) => new Date(`${s.slice(0, 10)}T00:00:00`);
 
+/**
+ * Formats a calendar date (YYYY-MM-DD) as is, or a full timestamp in the viewer's local time zone –
+ * slicing a UTC timestamp would show yesterday's date for late-evening events in Europe.
+ */
 export function fmtDate(iso?: string | null, opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' }) {
   if (!iso) return '–';
-  return parseISO(iso).toLocaleDateString(locale(), opts);
+  return (iso.length > 10 ? new Date(iso) : parseISO(iso)).toLocaleDateString(locale(), opts);
 }
 
 export const fmtDay = (iso: string) => fmtDate(iso, { weekday: 'short', day: '2-digit', month: '2-digit' });

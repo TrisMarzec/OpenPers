@@ -13,6 +13,7 @@ import type { AppContext, OpenPersModule } from './lib/context';
 import { FieldCipher } from './lib/crypto';
 import { HttpError, problem } from './lib/errors';
 import { LocalStorage } from './lib/storage';
+import { createTransport, Mailer } from './lib/mailer';
 import { coreModule } from './modules/core';
 import { registerAuthHook } from './modules/core/principal';
 import { featureModules } from './modules';
@@ -35,7 +36,7 @@ export async function buildApp(overrides: Partial<Config> = {}): Promise<Fastify
 
   const app = Fastify({ logger: config.logger ? { level: process.env.LOG_LEVEL ?? 'info' } : false, bodyLimit: 2 * 1024 * 1024, trustProxy: true });
   const registry: RouteRecord[] = [];
-  const ctx: AppContext = { db, config, authz: new Authz(db), cipher: new FieldCipher(config.secretKey), storage: new LocalStorage(config.storageDir), registry, exporters: {}, anonymizers: [], maintenance: [], services: {} };
+  const ctx: AppContext = { db, config, authz: new Authz(db), cipher: new FieldCipher(config.secretKey), storage: new LocalStorage(config.storageDir), registry, exporters: {}, anonymizers: [], maintenance: [], services: {}, mailer: new Mailer(db, config.mailTransport ?? createTransport(config.smtp)) };
   app.decorate('ctx', ctx);
   app.addHook('onClose', async () => close());
 

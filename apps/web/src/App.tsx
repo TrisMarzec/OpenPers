@@ -16,6 +16,8 @@ import { TasksPage } from './pages/Tasks';
 import { AnalyticsPage } from './pages/Analytics';
 import { PerformancePage } from './pages/Performance';
 import { SurveyAnswerPage, SurveysPage } from './pages/Surveys';
+import { WelcomePage } from './pages/Welcome';
+import { AcceptInvitePage, ForgotPasswordPage, ResetPasswordPage } from './pages/Invite';
 import { AbsencesPage } from './pages/Absences';
 import { TimePage } from './pages/Time';
 import { MyDocumentsPage } from './pages/Documents';
@@ -45,6 +47,9 @@ export function App() {
           <Routes>
             <Route path="/setup" element={<SetupPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/invite/:token" element={<AcceptInvitePage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
             <Route path="/careers" element={<CareersPage />} />
             <Route path="/careers/:slug" element={<CareerJobPage />} />
             <Route
@@ -55,6 +60,7 @@ export function App() {
               }
             >
               <Route index element={<DashboardPage />} />
+              <Route path="welcome" element={<WelcomePage />} />
               <Route path="me" element={<PersonPage selfView />} />
               <Route path="people" element={<PeoplePage />} />
               <Route path="people/:id" element={<PersonPage />} />

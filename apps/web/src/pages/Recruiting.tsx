@@ -120,7 +120,7 @@ export function RecruitingPage() {
               <td>
                 <Stamp status={j.status} />
               </td>
-              <td className="tnum">{fmtDate(j.updatedAt.slice(0, 10))}</td>
+              <td className="tnum">{fmtDate(j.updatedAt)}</td>
             </tr>
           ))}
         </Table>

@@ -10,6 +10,8 @@ import { CrudSection, FormFields, type FieldSpec } from './Crud';
 import { RolesSection } from './Roles';
 import { ChecklistTemplatesSection } from './ChecklistTemplates';
 import { LogoEditor } from '../../components/Photo';
+import { InvitationBadge } from '../../components/Invite';
+import { MailSettings } from './Mail';
 
 function CompanySettings() {
   const { t } = useTranslation();
@@ -37,7 +39,14 @@ function CompanySettings() {
     { key: 'retentionMonths', label: t('settings.retentionMonths'), type: 'number' },
   ];
   return (
-    <Section title={t('settings.sections.company')}>
+    <Section
+      title={t('settings.sections.company')}
+      actions={
+        <Link to="/welcome" className="text-sm font-semibold text-stamp hover:underline">
+          {t('welcome.openWizard')}
+        </Link>
+      }
+    >
       <div className="mb-6 border-b border-rule pb-6">
         <LogoEditor />
       </div>
@@ -240,7 +249,10 @@ function UserSettings() {
                 <td className="font-semibold">{u.personId ? <Link to={`/people/${u.personId}`} className="hover:text-stamp hover:underline">{u.email}</Link> : u.email}</td>
                 <td>{u.roles.map((r: any) => `${r.name} (${scopes[r.scope]})`).join(', ')}</td>
                 <td>
-                  <Stamp status={u.active ? 'ACTIVE' : 'INACTIVE'} />
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <Stamp status={u.active ? 'ACTIVE' : 'INACTIVE'} />
+                    {u.invitation?.status !== 'accepted' && <InvitationBadge invitation={u.invitation} />}
+                  </span>
                 </td>
               </tr>
             ))}
@@ -416,6 +428,7 @@ export function SettingsPage() {
     { path: 'documents', label: t('settings.sections.documents'), show: can('documents.manage'), el: <DocumentSettings /> },
     { path: 'onboarding', label: t('settings.sections.onboarding'), show: can('checklists.manage'), el: <ChecklistTemplatesSection /> },
     { path: 'users', label: t('settings.sections.users'), show: can('users.manage'), el: <UserSettings /> },
+    { path: 'mail', label: t('settings.sections.mail'), show: can('settings.manage'), el: <MailSettings /> },
     { path: 'integrations', label: t('settings.sections.integrations'), show: can('webhooks.manage'), el: <IntegrationSettings /> },
     { path: 'audit', label: t('settings.sections.audit'), show: can('settings.manage'), el: <AuditLog /> },
   ].filter((s) => s.show);

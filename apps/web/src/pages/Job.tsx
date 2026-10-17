@@ -89,7 +89,7 @@ function ApplicationDialog({ id, stages, onClose }: { id: string; stages: any[];
             <dt className="text-ink-soft">{t('recruiting.channel')}</dt>
             <dd>{a.channel}</dd>
             <dt className="text-ink-soft">{t('common.date')}</dt>
-            <dd className="tnum">{fmtDate(a.appliedAt.slice(0, 10))}</dd>
+            <dd className="tnum">{fmtDate(a.appliedAt)}</dd>
           </dl>
           {a.hasCv && (
             <a href={`/api/v1/applications/${a.id}/cv`} className="inline-flex items-center gap-2 font-semibold text-stamp hover:underline">
@@ -246,7 +246,7 @@ export function JobPage() {
                     >
                       <div className="font-semibold">{fullName(a.candidate)}</div>
                       <div className="flex items-center justify-between text-sm text-ink-faint">
-                        <span className="tnum">{fmtDate(a.appliedAt.slice(0, 10))}</span>
+                        <span className="tnum">{fmtDate(a.appliedAt)}</span>
                         {a.rating ? <span className="text-wait">{'★'.repeat(a.rating)}</span> : null}
                       </div>
                     </button>

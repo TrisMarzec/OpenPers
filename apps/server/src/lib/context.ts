@@ -6,6 +6,7 @@ import type { FieldCipher } from './crypto';
 import type { RouteRecord } from './api';
 import type { StorageAdapter } from './storage';
 import type { Config } from '../config';
+import type { Mailer } from './mailer';
 
 export interface AppContext {
   db: DB;
@@ -20,6 +21,8 @@ export interface AppContext {
   anonymizers: Array<(tx: Exec, personId: string) => Promise<void>>;
   /** Periodic jobs run by the background worker (hourly) and by `runMaintenance`. */
   maintenance: Array<(ctx: AppContext) => Promise<void>>;
+  /** Outgoing mail queue (SMTP or, without configuration, recorded only). */
+  mailer: Mailer;
   /** Cross-module services, e.g. the time module's balance calculation for analytics. */
   services: Record<string, (...args: any[]) => Promise<any>>;
 }
