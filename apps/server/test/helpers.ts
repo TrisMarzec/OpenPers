@@ -3,16 +3,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app';
+import type { Config } from '../src/config';
 
 export const ADMIN = { email: 'admin@example.com', password: 'correct-horse-battery' };
 
-export async function createTestApp(): Promise<FastifyInstance> {
+export async function createTestApp(extra: Partial<Config> = {}): Promise<FastifyInstance> {
   return buildApp({
     inMemory: true,
     secretKey: 'test-secret-key-that-is-long-enough-1234',
     storageDir: mkdtempSync(join(tmpdir(), 'openpers-test-')),
     logger: false,
     startWorker: false,
+    ...extra,
   });
 }
 
