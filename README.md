@@ -9,6 +9,21 @@ performance reviews and employee surveys – in one application under your own c
 
 > 🇩🇪 Deutsch weiter unten · German version below
 
+![Time tracking month list with flextime balance](docs/screenshots/time-light.png)
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/dashboard-dark.png" alt="Dashboard in dark mode with punch card, vacation and flextime balance"></td>
+    <td><img src="docs/screenshots/org-light.png" alt="Org chart with reporting lines"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/performance-dark.png" alt="Review results: self, manager and anonymous peer feedback"></td>
+    <td><img src="docs/screenshots/surveys-light.png" alt="Anonymous engagement survey results with eNPS"></td>
+  </tr>
+</table>
+
+<sub>Screenshots show the demo company from `npm run seed:demo` – all people are fictional.</sub>
+
 ## Features
 
 | Area | What it does |

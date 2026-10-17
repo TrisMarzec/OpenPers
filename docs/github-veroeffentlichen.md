@@ -135,8 +135,8 @@ Veröffentlichung fertig. Ausführliche Betriebsdoku für Nutzer: [`docs/self-ho
 ## 7. README-Feinschliff nach dem Push
 
 - In `README.md` `<owner>` durch deinen Namen ersetzen (Badges, Clone-URL, Image-Name).
-- Screenshots ergänzen: mit Demo-Daten (`DEMO_PASSWORD=… npm run seed:demo`) aufnehmen, als
-  `docs/screenshots/*.png` ablegen und im README einbinden. Nur erfundene Personen zeigen.
+- Screenshots liegen bereits in `docs/screenshots/` (Demo-Firma aus `npm run seed:demo`, nur erfundene
+  Personen) und sind im README eingebunden. Neue Aufnahmen bitte ebenfalls nur mit Demo-Daten.
 
 ## 8. Rechtliches – kurz
 
@@ -160,4 +160,4 @@ Veröffentlichung fertig. Ausführliche Betriebsdoku für Nutzer: [`docs/self-ho
 - [ ] Branch-Schutz, Secret Scanning, Dependabot, Private Vulnerability Reporting aktiv
 - [ ] Tag `v0.1.0` gepusht, Release-Workflow grün, Paket auf *Public*
 - [ ] Installation aus dem veröffentlichten Image getestet
-- [ ] `<owner>` im README ersetzt, Screenshots ergänzt
+- [ ] `<owner>` im README ersetzt
