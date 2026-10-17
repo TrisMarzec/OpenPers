@@ -1,4 +1,9 @@
-# OpenPers
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/openpers-logo-dark.svg">
+    <img src="brand/openpers-logo.svg" alt="OpenPers" height="56">
+  </picture>
+</h1>
 
 **Open-source HR software you host yourself.** For small and mid-sized companies in Germany, Austria
 and Switzerland: employee records, absences, time tracking, documents, recruiting, onboarding,
