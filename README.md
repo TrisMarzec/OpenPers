@@ -4,7 +4,7 @@
 and Switzerland: employee records, absences, time tracking, documents, recruiting, onboarding,
 performance reviews and employee surveys – in one application under your own control.
 
-[![CI](https://github.com/<owner>/openpers/actions/workflows/ci.yml/badge.svg)](https://github.com/<owner>/openpers/actions/workflows/ci.yml)
+[![CI](https://github.com/trismar/openpers/actions/workflows/ci.yml/badge.svg)](https://github.com/trismar/openpers/actions/workflows/ci.yml)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
 > 🇩🇪 Deutsch weiter unten · German version below
@@ -43,7 +43,7 @@ performance reviews and employee surveys – in one application under your own c
 ## Quick start (Docker)
 
 ```bash
-git clone https://github.com/<owner>/openpers.git && cd openpers
+git clone https://github.com/trismar/openpers.git && cd openpers
 cp .env.example .env
 # set SECRET_KEY (openssl rand -hex 32) and POSTGRES_PASSWORD;
 # optional OPENPERS_IMAGE=ghcr.io/<owner>/openpers:latest to skip the local build
