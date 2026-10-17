@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { fmtDate, fullName, todayISO } from '../lib/format';
 import { LogoEditor } from '../components/Photo';
 import { CompanyDocUpload, useCompanyDocs } from '../components/CompanyDocs';
+import { InviteLinkBox, useMailStatus } from '../components/Invite';
 import { Button, Checkbox, cx, Field, Input, Select, Spinner, useErrorText, useToast } from '../components/ui';
 import { FormFields, type FieldSpec } from './settings/Crud';
 
@@ -401,18 +402,28 @@ function PeopleStep({ next }: { next: () => void }) {
   const people = useQuery({ queryKey: ['persons', 'welcome'], queryFn: () => api.get('/persons?limit=200') });
   const units = useQuery({ queryKey: ['org-units'], queryFn: () => api.get('/org-units') });
   const workplaces = useQuery({ queryKey: ['workplaces'], queryFn: () => api.get('/workplaces') });
+  const roles = useQuery({ queryKey: ['roles'], queryFn: () => api.get('/roles') });
+  const mail = useMailStatus();
   const empty = { firstName: '', lastName: '', email: '', positionTitle: '', orgUnitId: '', workplaceId: '', startDate: todayISO() };
   const [f, setF] = useState(empty);
+  const [invite, setInvite] = useState({ send: true, role: 'employee' });
+  // Without a mail server the admin hands out the links; they are shown until the page is left.
+  const [links, setLinks] = useState<{ name: string; url: string }[]>([]);
   const add = useMutation({
-    mutationFn: () =>
-      api.post('/persons', {
+    mutationFn: async () => {
+      const p = await api.post('/persons', {
         firstName: f.firstName,
         lastName: f.lastName,
         email: f.email,
         employment: { startDate: f.startDate, positionTitle: f.positionTitle || null, orgUnitIds: f.orgUnitId ? [f.orgUnitId] : [], workplaceId: f.workplaceId || null },
-      }),
-    onSuccess: () => {
-      toast(t('welcome.people.added', { name: `${f.firstName} ${f.lastName}` }));
+      });
+      if (!invite.send) return null;
+      return api.post('/users', { email: f.email, roles: [invite.role], personId: p.id, invite: true });
+    },
+    onSuccess: (u: any) => {
+      const name = `${f.firstName} ${f.lastName}`;
+      if (u?.inviteUrl) setLinks((l) => [...l, { name, url: u.inviteUrl }]);
+      toast(u ? (u.inviteUrl ? t('welcome.people.addedLink', { name }) : t('welcome.people.addedInvited', { name, email: f.email })) : t('welcome.people.added', { name }));
       setF({ ...empty, orgUnitId: f.orgUnitId, workplaceId: f.workplaceId, startDate: f.startDate });
       ['persons', 'setup-guide', 'directory'].forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
     },
@@ -470,6 +481,31 @@ function PeopleStep({ next }: { next: () => void }) {
           </Button>
         </div>
       </form>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Checkbox label={t('welcome.people.invite')} hint={mail && !mail.configured ? t('invite.byMailNoServer') : t('invite.byMailHint')} checked={invite.send} onChange={(v) => setInvite({ ...invite, send: v })} />
+        {invite.send && (
+          <label className="flex items-center gap-2 text-sm">
+            {t('person.role')}
+            <Select className="h-8 w-44" value={invite.role} onChange={(e) => setInvite({ ...invite, role: e.target.value })}>
+              {(roles.data?.items ?? []).map((r: any) => (
+                <option key={r.key} value={r.key}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )}
+      </div>
+      {links.length > 0 && (
+        <div className="grid gap-2">
+          {links.map((l) => (
+            <div key={l.url}>
+              <p className="mb-1 text-sm font-semibold">{l.name}</p>
+              <InviteLinkBox url={l.url} />
+            </div>
+          ))}
+        </div>
+      )}
       {(people.data?.items ?? []).length > 0 && (
         <ul className="grid gap-1 text-sm">
           {people.data.items.map((p: any) => (

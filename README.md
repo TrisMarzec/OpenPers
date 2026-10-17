@@ -44,7 +44,7 @@ performance reviews and employee surveys – in one application under your own c
 | **Surveys** | Anonymous surveys (answers stored without user or time), templates (engagement pulse, eNPS, onboarding), results only from 3 answers, eNPS, department heatmap, reminders |
 | **Analytics** | Headcount, hires and exits, turnover, tenure, absence rates – with table view, CSV export and small-group suppression |
 | **Guided setup** | After registration a six-step guide sets up company, locations, departments & teams, access to sensitive data, company documents and the first employees – resumable, with progress on the dashboard |
-| **Platform** | Dark and light mode, German & English UI, company logo, audit log, GDPR export & anonymization, REST API with OpenAPI, API tokens, signed webhooks |
+| **Platform** | Invitations by e-mail (SMTP) with self-chosen passwords, password reset, dark and light mode, German & English UI, company logo, audit log, GDPR export & anonymization, REST API with OpenAPI, API tokens, signed webhooks |
 
 ## Quick start (Docker)
 

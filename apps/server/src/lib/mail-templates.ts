@@ -9,17 +9,17 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
  * Only inline styles; no images (many clients block them, SVG logos not at all).
  */
 function layout(o: { company: string; heading: string; paragraphs: string[]; button: { label: string; url: string }; footer: string }): Omit<MailMessage, 'to' | 'subject'> {
-  const html = `<!doctype html><html><body style="margin:0;background:#f6f7f9;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#16233f">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9;padding:32px 12px"><tr><td align="center">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #dfe3ea;border-radius:10px">
+  const html = `<!doctype html><html><body style="margin:0;padding:0" bgcolor="#f6f7f9">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#f6f7f9" style="background-color:#f6f7f9;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#16233f"><tr><td align="center" style="padding:32px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:520px;background-color:#ffffff;border:1px solid #dfe3ea;border-radius:10px">
 <tr><td style="padding:22px 28px;border-bottom:1px solid #eef0f4;font-weight:700;font-size:16px;color:#2340c8">${esc(o.company)}</td></tr>
 <tr><td style="padding:28px">
 <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3">${esc(o.heading)}</h1>
 ${o.paragraphs.map((p) => `<p style="margin:0 0 14px;font-size:15px;line-height:1.55">${esc(p)}</p>`).join('\n')}
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0"><tr><td style="background:#2340c8;border-radius:8px">
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0"><tr><td bgcolor="#2340c8" style="background-color:#2340c8;border-radius:8px">
 <a href="${esc(o.button.url)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-weight:600;font-size:15px;text-decoration:none">${esc(o.button.label)}</a>
 </td></tr></table>
-<p style="margin:0;font-size:13px;line-height:1.5;color:#5b6780">${esc(o.footer)}<br><a href="${esc(o.button.url)}" style="color:#2340c8;word-break:break-all">${esc(o.button.url)}</a></p>
+<p style="margin:0;font-size:13px;line-height:1.5;color:#5b6780">${esc(o.footer)}<br><a href="${esc(o.button.url)}" style="color:#2340c8">${esc(o.button.url)}</a></p>
 </td></tr></table>
 <p style="font-size:12px;color:#8a94a6;margin:16px 0 0">OpenPers</p>
 </td></tr></table></body></html>`;

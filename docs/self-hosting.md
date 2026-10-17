@@ -32,6 +32,7 @@ Edit `.env`:
 | `DATA_DIR` | no | Where uploads (and the embedded DB without `DATABASE_URL`) live. Default `/data` in Docker. |
 | `PORT`, `HOST` | no | Listening port / interface (default `3000`, `0.0.0.0`). |
 | `LOG_LEVEL` | no | `info` (default) or `silent`. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`, `MAIL_FROM` | recommended | Mail server for invitations and password resets, see below. |
 
 Start it:
 
@@ -60,7 +61,31 @@ nginx needs `client_max_body_size 25m;` (document uploads are limited to 25 MB) 
 `proxy_set_header Host/X-Forwarded-For/X-Forwarded-Proto` lines. Bind the container port to
 localhost only (`"127.0.0.1:3000:3000"` in `docker-compose.yml`) when the proxy runs on the host.
 
-## 3. Backups
+## 3. E-mail (invitations, password reset)
+
+OpenPers sends invitations ("choose your password") and password-reset links by e-mail. Any SMTP
+server works – your Microsoft 365 / Google Workspace account, your hosting provider, or a service
+such as Brevo, Mailjet or Amazon SES (EU regions available).
+
+```ini
+SMTP_HOST=smtp.example.com
+# 587 = STARTTLS, 465 = TLS from the start
+SMTP_PORT=587
+SMTP_USER=hr@example.com
+SMTP_PASSWORD=…
+MAIL_FROM="Musterwerk HR <hr@example.com>"
+```
+
+Restart OpenPers, then send a test e-mail under **Settings → E-mail**; the delivery log there shows
+failures with the server's error message. Failed mails are retried automatically (5 attempts with
+increasing delay). Make sure `APP_URL` is the public address – the links in the mails point there.
+For good deliverability, the sender domain needs SPF and DKIM records from your mail provider.
+
+**Without a mail server** OpenPers still works: when you invite someone, the invitation link is
+shown to you to pass on (e.g. via chat). It works once and expires after 7 days. "Forgot password"
+needs a mail server – without one, admins set a new password in the person's profile.
+
+## 4. Backups
 
 Back up three things, and test a restore at least once:
 
@@ -72,7 +97,7 @@ Back up three things, and test a restore at least once:
 Restore: start an empty stack, `psql` the dump into the `db` container, copy the files back into the
 volume, use the same `SECRET_KEY`, start `openpers`.
 
-## 4. Updates
+## 5. Updates
 
 ```bash
 git pull                      # or change OPENPERS_IMAGE to the new version
@@ -83,7 +108,7 @@ docker compose up -d --build
 Migrations run automatically at start-up. Take a backup before updating to a new minor version and
 read the release notes.
 
-## 5. Without Docker
+## 6. Without Docker
 
 Node.js 22+:
 
@@ -97,7 +122,7 @@ Without `DATABASE_URL` an embedded PostgreSQL (PGlite) stores data in `DATA_DIR/
 trying it out and small teams; use a real PostgreSQL for production. Run it as a service, e.g. with a
 systemd unit using `WorkingDirectory=` and `ExecStart=/usr/bin/npm start`.
 
-## 6. Operations
+## 7. Operations
 
 - Health check: `GET /healthz` returns `{ "status": "ok", "version": "…" }`.
 - API documentation: `GET /api/v1/openapi.json`; API tokens and webhooks under *Settings → API & Webhooks*.
@@ -105,7 +130,7 @@ systemd unit using `WorkingDirectory=` and `ExecStart=/usr/bin/npm start`.
 - Background jobs (reminders, overdue tasks, survey closing, applicant data retention) run inside
   the server process; no cron needed. Run a single instance.
 
-## 7. Data protection notes (DACH)
+## 8. Data protection notes (DACH)
 
 - You are the controller; OpenPers is software, not a service provider. Document the processing in
   your record of processing activities (Art. 30 GDPR) and inform employees.
