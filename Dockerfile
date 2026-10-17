@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build ----
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/shared/package.json packages/shared/
@@ -14,7 +14,7 @@ COPY apps ./apps
 RUN npm run build && npm prune --omit=dev
 
 # ---- runtime ----
-FROM node:22-alpine
+FROM node:25-alpine
 ENV NODE_ENV=production \
     PORT=3000 \
     DATA_DIR=/data
